@@ -1,7 +1,8 @@
-# Specification Quality Checklist: REPSE Compliance Tracker
+# Specification Quality Checklist: Bóveda de Cumplimiento REPSE (Core)
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning
 **Created**: 2026-05-16
+**Updated**: 2026-05-16 (segregación de US3/US4/US5 a specs 002/003/004)
 **Feature**: [Link to spec.md](../spec.md)
 
 ## Content Quality
@@ -31,6 +32,9 @@
 
 ## Notes
 
-- Items marked incomplete require spec updates before `/speckit-clarify` or `/speckit-plan`
-- Clarificaciones resueltas en sesión 2026-05-16: portal de proveedor, catálogo precargado, cálculo de vencimiento, verificación de autenticidad y retención.
+- Alcance reducido al núcleo: US1 (registro+carga) y US2 (estado de cumplimiento). Las features periféricas se separaron en:
+  - [`002-compliance-alerts`](../../002-compliance-alerts/spec.md) — alertas y recordatorios
+  - [`003-document-catalog-admin`](../../003-document-catalog-admin/spec.md) — administración del catálogo
+  - [`004-compliance-reports`](../../004-compliance-reports/spec.md) — reportes exportables
 - Pendiente operativo (no bloqueante): validar con equipo legal la lista exacta de tipos canónicos del catálogo antes del lanzamiento.
+- Clarificaciones de la sesión 2026-05-16 aplican globalmente; los specs 002/003/004 las heredan por referencia.
