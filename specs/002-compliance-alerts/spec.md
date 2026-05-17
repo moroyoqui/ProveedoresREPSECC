@@ -24,6 +24,7 @@ Aplica el bloque de **clarificaciones globales** definido en el spec 001 (sesió
 
 - Solo el cliente contratante accede al sistema (no hay portal de proveedor); las alertas se dirigen a usuarios del tenant únicamente.
 - Las notificaciones del MVP se envían por **correo electrónico** y se muestran **in-app**. Otros canales quedan fuera de alcance.
+- **Documentos requeridos por proveedor**: derivados del `SupplierType` asignado al proveedor y de sus `SupplierTypeDocumentRequirement` activos (spec 001 FR-012b, spec 003 sección C). Las alertas SOLO se generan sobre documentos que el tipo del proveedor exige; la periodicidad efectiva = override de la asociación si existe, si no la del `DocumentType`.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -82,14 +83,16 @@ Un administrador define en la organización: la antelación por defecto (en día
 - ¿Qué pasa si el proceso diario falla a media corrida? Al reintentarse, la idempotencia diaria evita envíos duplicados sobre los documentos ya notificados ese día.
 - ¿Qué pasa si un proveedor está inactivo? No se generan alertas para sus documentos.
 - ¿Qué pasa si un tipo de documento es desactivado en el catálogo? Las alertas dejan de generarse para ese tipo desde el siguiente día.
+- ¿Qué pasa si se cambia el `SupplierType` de un proveedor? El conjunto de documentos exigidos se recalcula al siguiente proceso diario; alertas que ya no aplican se retiran del centro de notificaciones; nuevas "Faltante" pueden surgir si el nuevo tipo exige documentos que el proveedor no había cargado.
+- ¿Qué pasa con un proveedor en tipo "Sin clasificar"? Las alertas se generan contra el catálogo canónico completo del tenant (comportamiento equivalente a "exigir todo"); el admin debería reclasificarlo para reducir ruido.
 
 ## Requirements *(mandatory)*
 
 ### Functional Requirements
 
 - **FR-001**: El sistema DEBE ejecutar al menos una vez al día (en horario local del tenant configurable, por defecto 08:00) un proceso que recalcule el estado de cada documento con vigencia y determine si corresponde generar alertas.
-- **FR-002**: El sistema DEBE generar una notificación de "por vencer" para todo documento cuya fecha de vencimiento efectiva caiga dentro de la antelación configurada por la organización (por defecto 15 días) y aún no haya recibido alerta ese día.
-- **FR-003**: El sistema DEBE generar una notificación de "vencido" diaria para todo documento con fecha de vencimiento ya superada, mientras no esté silenciado y no haya sido renovado.
+- **FR-002**: El sistema DEBE generar una notificación de "por vencer" para todo documento que (a) sea requerido por el `SupplierType` del proveedor y (b) cuya fecha de vencimiento efectiva caiga dentro de la antelación configurada por la organización (por defecto 15 días), y aún no haya recibido alerta ese día. La periodicidad usada para el cálculo es la efectiva (override de la asociación o herencia del `DocumentType`).
+- **FR-003**: El sistema DEBE generar una notificación de "vencido" diaria para todo documento (a) requerido por el `SupplierType` del proveedor, (b) con fecha de vencimiento ya superada, mientras no esté silenciado y no haya sido renovado. También DEBE generar alertas de "Faltante" cuando un `DocumentType` requerido por el `SupplierType` no tenga documento `is_latest=TRUE` para el periodo vigente.
 - **FR-004**: Cada notificación DEBE entregarse en **dos canales** simultáneamente: (a) correo electrónico al/los destinatario(s), y (b) entrada in-app visible en el centro de notificaciones del tenant.
 - **FR-005**: El sistema DEBE agrupar en un único correo todas las alertas del mismo proveedor que se generan el mismo día para los mismos destinatarios, en lugar de enviar un correo por documento.
 - **FR-006**: El sistema DEBE evitar envíos duplicados: una vez generada y enviada (o intentada) una alerta para un documento en un día determinado, no se reintenta esa misma alerta hasta el siguiente día calendario.
