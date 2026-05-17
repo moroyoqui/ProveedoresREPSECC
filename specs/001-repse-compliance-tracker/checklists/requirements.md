@@ -2,7 +2,7 @@
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning
 **Created**: 2026-05-16
-**Updated**: 2026-05-16 (segregación de US3/US4/US5 a specs 002/003/004)
+**Updated**: 2026-05-16 (segregación a 002/003/004/005 + trazas de auditoría visibles del documento)
 **Feature**: [Link to spec.md](../spec.md)
 
 ## Content Quality
@@ -37,4 +37,6 @@
   - [`003-document-catalog-admin`](../../003-document-catalog-admin/spec.md) — administración del catálogo
   - [`004-compliance-reports`](../../004-compliance-reports/spec.md) — reportes exportables
 - Pendiente operativo (no bloqueante): validar con equipo legal la lista exacta de tipos canónicos del catálogo antes del lanzamiento.
-- Clarificaciones de la sesión 2026-05-16 aplican globalmente; los specs 002/003/004 las heredan por referencia.
+- Clarificaciones globales de la sesión 2026-05-16 aplican a 001/002/003/004/005.
+- Clarificaciones locales a 001 (sesión 2026-05-16): trazas de auditoría visibles del documento (agregado/actualizado/validado), UI en detalle + tooltip + tab Historial, acciones del sistema NO bumpean campos visibles.
+- Propagado a [data-model.md](../data-model.md) (`last_updated_by` / `last_updated_at` en `documents` + índice + reglas) y [contracts/documents.md](../contracts/documents.md) (objeto `audit` en respuesta + endpoint `GET /documents/{id}/history`).
