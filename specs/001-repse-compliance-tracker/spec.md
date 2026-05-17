@@ -18,15 +18,19 @@ Este spec cubre el **núcleo** del producto: registro de proveedores, carga de d
 
 ## Clarifications
 
-Las siguientes clarificaciones son **globales** al producto y aplican también a los specs 002, 003 y 004.
+Las clarificaciones marcadas como **globales** aplican también a los specs 002, 003, 004 y 005. Las marcadas como **locales** aplican solo a este spec.
 
 ### Session 2026-05-16
 
-- Q: ¿El proveedor REPSE accede al sistema en el MVP para subir su propia documentación, o únicamente el cliente contratante administra y carga documentos por él? → A: Solo el cliente contratante carga; el proveedor NO accede al sistema en v1.
-- Q: ¿Cómo se entrega el catálogo de tipos de documento de cumplimiento de fábrica? → A: Catálogo canónico curado por el equipo, precargado para todos los tenants, editable por cada cliente (activar/desactivar/agregar tipos personalizados).
-- Q: ¿Cómo se calcula la fecha de vencimiento de un documento con vigencia? → A: Regla por periodicidad anclada al periodo cubierto (mensual = fin del mes siguiente; bimestral = fin del bimestre fiscal SAT/IMSS siguiente; anual = cierre del año fiscal siguiente), con override manual permitido en cada carga.
-- Q: ¿Hasta dónde llega el sistema en verificar la autenticidad de los documentos contra SAT/IMSS/INFONAVIT? → A: Sin integraciones a servicios oficiales en v1. Se ofrece (1) OCR best-effort sobre el PDF para prellenar fechas de emisión/vigencia y RFC del proveedor, y (2) verificación manual estructurada: cualquier usuario con permiso puede marcar un documento como "verificado", registrando usuario, fecha y nota opcional. La integración automática con SAT/IMSS/INFONAVIT queda fuera de alcance de v1.
-- Q: ¿Cuál es la política de retención de archivos cargados, versiones históricas y bitácora de auditoría? → A: Retención indefinida mientras el tenant esté activo. Al darse de baja la organización, los datos se conservan 90 días en estado de gracia (recuperables por el cliente) y luego se eliminan de forma permanente.
+- Q (global): ¿El proveedor REPSE accede al sistema en el MVP para subir su propia documentación, o únicamente el cliente contratante administra y carga documentos por él? → A: Solo el cliente contratante carga; el proveedor NO accede al sistema en v1.
+- Q (global): ¿Cómo se entrega el catálogo de tipos de documento de cumplimiento de fábrica? → A: Catálogo canónico curado por el equipo, precargado para todos los tenants, editable por cada cliente (activar/desactivar/agregar tipos personalizados).
+- Q (global): ¿Cómo se calcula la fecha de vencimiento de un documento con vigencia? → A: Regla por periodicidad anclada al periodo cubierto (mensual = fin del mes siguiente; bimestral = fin del bimestre fiscal SAT/IMSS siguiente; anual = cierre del año fiscal siguiente), con override manual permitido en cada carga.
+- Q (global): ¿Hasta dónde llega el sistema en verificar la autenticidad de los documentos contra SAT/IMSS/INFONAVIT? → A: Sin integraciones a servicios oficiales en v1. Se ofrece (1) OCR best-effort sobre el PDF para prellenar fechas de emisión/vigencia y RFC del proveedor, y (2) verificación manual estructurada: cualquier usuario con permiso puede marcar un documento como "verificado", registrando usuario, fecha y nota opcional. La integración automática con SAT/IMSS/INFONAVIT queda fuera de alcance de v1.
+- Q (global): ¿Cuál es la política de retención de archivos cargados, versiones históricas y bitácora de auditoría? → A: Retención indefinida mientras el tenant esté activo. Al darse de baja la organización, los datos se conservan 90 días en estado de gracia (recuperables por el cliente) y luego se eliminan de forma permanente.
+- Q (local): ¿Qué acciones cuentan como "actualización" del documento para fines de auditoría visible al usuario? → A: **Cualquier cambio sobre el documento** — sustitución de archivo (nueva versión), override manual de la fecha de vencimiento, marca/anulación de verificación, edición de metadatos. Todas estas acciones actualizan un único par de campos en el documento (`last_updated_by` / `last_updated_at`) que se muestran al usuario; la bitácora completa acción-por-acción sigue viviendo en `audit_log`.
+- Q (local): ¿Dónde se muestran las trazas de auditoría visibles del documento (agregado / actualizado / validado) en la UI? → A: (1) En el **detalle del documento** como tres bloques etiquetados con usuario, fecha y hora; (2) en el **listado de documentos del proveedor** como tooltip al pasar sobre la fila o sobre el ícono de estado, mostrando los tres registros resumidos; (3) en un **tab "Historial"** accesible bajo demanda desde el detalle, mostrando la lista cronológica completa de acciones (todas las versiones + todos los cambios) a partir de `audit_log` filtrado por documento.
+- Q (local): ¿Las acciones automáticas del sistema (OCR, recálculo de estado, jobs, migraciones) cuentan como "actualización" visible? → A: **No**. Solo las acciones realizadas por un usuario humano modifican los campos visibles `last_updated_by` / `last_updated_at`. Los eventos del sistema se registran en `audit_log` con `actor_user_id = NULL` y aparecen en el tab "Historial" del detalle como entradas etiquetadas "Sistema · <evento>" (p. ej. "Sistema · OCR completado", "Sistema · Estado recalculado") sin alterar los bloques de los tres registros visibles.
+- Q (global): ¿Cómo se determinan los documentos requeridos por un proveedor? ¿Todos los del catálogo del tenant o un subconjunto según su industria? → A: Cada proveedor pertenece a un **Tipo de Proveedor** (FK 1:N, NOT NULL). El conjunto de documentos requeridos se deriva del tipo asignado: los `DocumentType` que la asociación `SupplierType ↔ DocumentType` declara para esa industria, con periodicidad heredada del `DocumentType` o sobrescrita por la asociación. Onboarding siembra automáticamente un `SupplierType` "Sin clasificar" con el catálogo canónico completo activo para no bloquear el alta de proveedores. La administración del catálogo de tipos de proveedor y sus requisitos vive en el spec [`003-document-catalog-admin`](../003-document-catalog-admin/spec.md) (extendido a "Administración de Catálogos"). Las plantillas por industria (Construcción, Servicios profesionales, Transporte, Manufactura, Limpieza, Seguridad privada, Outsourcing) se importan bajo demanda desde un wizard.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -40,11 +44,16 @@ Un administrador del cliente contratante registra a sus proveedores REPSE en la 
 
 **Acceptance Scenarios**:
 
-1. **Given** un administrador autenticado sin proveedores registrados, **When** registra un nuevo proveedor con razón social y RFC, **Then** el proveedor aparece en el listado del tenant y solo es visible para usuarios de ese tenant.
+1. **Given** un administrador autenticado sin proveedores registrados, **When** registra un nuevo proveedor con razón social y RFC sin elegir tipo, **Then** el proveedor aparece en el listado del tenant asignado al tipo "Sin clasificar" (que exige el catálogo canónico completo) y solo es visible para usuarios de ese tenant.
+1a. **Given** un administrador con catálogo de tipos de proveedor configurado, **When** crea un proveedor y selecciona el tipo "Construcción", **Then** el conjunto de documentos requeridos para ese proveedor proviene de los `DocumentType` asociados a "Construcción", y los demás tipos del catálogo del tenant NO se exigen ni cuentan como "Faltante".
+1b. **Given** un proveedor con tipo "Servicios profesionales" (que no exige opinión IMSS) y luego reclasificado a "Construcción" (que sí la exige), **When** el administrador guarda el cambio, **Then** los documentos requeridos se recalculan inmediatamente: la opinión IMSS pasa a ser "Faltante" hasta que se cargue.
 2. **Given** un proveedor existente, **When** el administrador sube un archivo a un tipo de documento con vigencia mensual indicando el periodo cubierto, **Then** el documento queda registrado con su tipo, periodo, fecha de carga y fecha de vencimiento calculada conforme a FR-010.
 3. **Given** un tipo de documento sin vigencia (p. ej. acta constitutiva), **When** se sube el archivo, **Then** queda registrado como vigente indefinidamente y no genera fechas de expiración.
 4. **Given** un archivo cuyo formato o tamaño excede lo permitido, **When** el usuario intenta subirlo, **Then** el sistema rechaza la carga con un mensaje claro y no crea registros parciales.
 5. **Given** un PDF cargable, **When** el sistema ejecuta OCR best-effort, **Then** prellena fecha de emisión, fecha de vigencia y RFC del proveedor; el usuario puede corregir esos valores antes de guardar y los valores finales prevalecen.
+6. **Given** un documento recién cargado, **When** se abre el detalle, **Then** se muestra el bloque "Agregado por" con el nombre del usuario que lo subió, fecha y hora en la zona horaria del tenant; los bloques "Última actualización" y "Validado" se muestran vacíos / "Sin verificar".
+7. **Given** un documento existente, **When** otro usuario sustituye el archivo por una nueva versión, **Then** el bloque "Agregado por" sigue mostrando al usuario original con la fecha de carga original, y el bloque "Última actualización" se actualiza al usuario y momento de la sustitución; el tab "Historial" lista ambas versiones cronológicamente.
+8. **Given** un documento ya verificado, **When** se abre el detalle, **Then** el bloque "Validado por" muestra al usuario verificador, la fecha y la nota (si fue capturada).
 
 ---
 
@@ -61,7 +70,7 @@ Cualquier usuario del tenant puede ver, en una sola pantalla por proveedor, el e
 1. **Given** un proveedor con todos sus documentos requeridos vigentes, **When** se abre el detalle, **Then** el indicador de cumplimiento muestra 100% y cada documento aparece con estado "Vigente".
 2. **Given** un documento con vigencia mensual cargado para el mes anterior, **When** se calcula el estado, **Then** el sistema lo marca como "Vencido" y resalta visualmente la fila.
 3. **Given** un documento que vence dentro de los próximos N días configurados (por defecto 15), **When** se calcula el estado, **Then** se muestra como "Por vencer".
-4. **Given** un tipo de documento requerido pero sin archivo cargado, **When** se calcula el estado, **Then** aparece como "Faltante" y cuenta en contra del cumplimiento agregado.
+4. **Given** un tipo de documento requerido **por el tipo del proveedor** pero sin archivo cargado, **When** se calcula el estado, **Then** aparece como "Faltante" y cuenta en contra del cumplimiento agregado. Los tipos de documento que NO requiere su tipo de proveedor no se muestran ni cuentan.
 5. **Given** un documento marcado manualmente como "verificado", **When** se abre el detalle, **Then** se muestra un indicador adicional de verificación con usuario y fecha, independiente del estado de vigencia.
 
 ---
@@ -75,6 +84,8 @@ Cualquier usuario del tenant puede ver, en una sola pantalla por proveedor, el e
 - ¿Cómo se previene la fuga de información entre tenants? Todas las consultas se filtran por `tenant_id` desde la capa de datos; pruebas automatizadas cubren el caso negativo (tenant A no ve datos de tenant B).
 - ¿Qué pasa si el OCR no logra extraer ningún dato del PDF? El formulario se muestra vacío y el usuario captura manualmente; no se bloquea la carga.
 - ¿Qué pasa con un documento si el tipo de documento es desactivado en el catálogo del tenant después de haberse cargado? El documento existente permanece en el histórico con su estado actual; deja de aparecer como requisito activo en el indicador agregado.
+- ¿Qué pasa si se elimina un tipo de proveedor que tiene proveedores asociados? La eliminación se rechaza; se ofrece "archivar" el tipo. Los proveedores deben reasignarse antes (en bulk o uno a uno). Mientras el tipo esté archivado y haya proveedores asociados, no se permite reasignar otros proveedores a ese tipo.
+- ¿Qué pasa si un proveedor está en el tipo "Sin clasificar" y la organización quiere eliminar ese tipo? No se permite eliminar "Sin clasificar" en ningún caso (es de origen `system`); solo se puede vaciar reasignando todos sus proveedores a tipos personalizados.
 
 ## Requirements *(mandatory)*
 
@@ -89,7 +100,8 @@ Cualquier usuario del tenant puede ver, en una sola pantalla por proveedor, el e
 
 **Gestión de proveedores**
 
-- **FR-005**: Los usuarios DEBEN poder crear, editar, listar, dar de baja y reactivar proveedores con al menos: razón social, RFC, contacto principal y estado (activo/inactivo).
+- **FR-005**: Los usuarios DEBEN poder crear, editar, listar, dar de baja y reactivar proveedores con al menos: razón social, RFC, contacto principal, estado (activo/inactivo) y **tipo de proveedor** (FK 1:N obligatoria; ver FR-005a).
+- **FR-005a**: Cada proveedor DEBE estar asociado a exactamente un **Tipo de Proveedor** del catálogo del tenant. Si el usuario no elige uno al crear, se asigna automáticamente el tipo "Sin clasificar" sembrado por el sistema (que tiene activos todos los tipos canónicos de documento). El usuario puede reasignar el tipo en cualquier momento desde la edición del proveedor; el cambio recalcula los documentos requeridos y el estado de cumplimiento agregado.
 - **FR-006**: El sistema DEBE validar que el RFC tenga el formato correcto y que sea único dentro de la misma organización.
 
 **Catálogo canónico (consumo)**
@@ -110,12 +122,27 @@ Cualquier usuario del tenant puede ver, en una sola pantalla por proveedor, el e
 - **FR-010**: El sistema DEBE rechazar archivos que excedan el tamaño máximo permitido o cuyo formato no esté en la lista permitida, mostrando un mensaje claro.
 - **FR-011**: El sistema DEBE conservar el histórico de versiones por tipo y periodo: una nueva carga no borra la anterior, sino que la archiva.
 
+**Auditoría visible del documento**
+
+- **FR-011a**: Cada documento DEBE exponer **tres trazas de auditoría visibles para el usuario**, no solo en la bitácora:
+  - **Agregado**: usuario que subió el documento (`uploaded_by`) + fecha/hora de carga (`created_at`). Inmutable.
+  - **Actualizado**: usuario que realizó el último cambio (`last_updated_by`) + fecha/hora (`last_updated_at`). Se actualiza ante CUALQUIER cambio sobre el documento: sustitución del archivo (nueva versión), override manual de la fecha de vencimiento, marca o anulación de verificación, edición de metadatos. Si no ha habido cambios desde la carga inicial, ambos campos quedan NULL (la UI muestra "—" o se omite).
+  - **Validado/Aprobado**: usuario que marcó "verificado" (`verified_by`) + fecha/hora (`verified_at`) + nota opcional (`verified_note`). NULL si nunca se ha verificado.
+- **FR-011b**: Cuando un documento es sustituido por una nueva versión, la traza "Agregado" del documento (al considerar el conjunto Proveedor × Tipo × Periodo) DEBE corresponder a la **carga original** (versión 1); la versión nueva queda como "Actualizado". El usuario puede ver el historial de versiones desde el detalle del documento y cada versión conserva su propio `uploaded_by` / `created_at`.
+- **FR-011c**: La UI DEBE mostrar las trazas de auditoría visibles de un documento en **tres ubicaciones**:
+  - **Detalle del documento**: tres bloques etiquetados ("Agregado por", "Última actualización", "Validado por"), cada uno con nombre del usuario, fecha y hora en la zona horaria del tenant (formato `dd MMM yyyy HH:mm`). Si una traza no aplica todavía (p. ej. nunca verificado), su bloque se muestra como "Sin verificar" sin mostrar usuario/fecha.
+  - **Listado de documentos** (en el detalle del proveedor): al pasar el cursor sobre la fila o sobre el ícono de estado, un tooltip muestra los tres registros resumidos en una sola línea por traza.
+  - **Tab "Historial"** dentro del detalle del documento: lista cronológica de TODAS las acciones de ese documento (todas las versiones + todos los cambios), construida a partir de `audit_log` filtrado por `entity_type='document'` y `entity_id`. Accesible para todos los roles que tienen visibilidad sobre el documento.
+- **FR-011d**: Para el `viewer` (rol de solo consulta), el tab "Historial" DEBE ser visible (consulta), pero los bloques de auditoría del detalle y los tooltips del listado NO DEBEN ocultarse: la trazabilidad de "quién hizo qué" es información operativa básica.
+- **FR-011e**: Las **acciones del sistema** (OCR best-effort, recálculo automático de estado, jobs de retención, migraciones de datos, recálculo por cambio de umbral "por vencer") NO DEBEN modificar `last_updated_by` ni `last_updated_at`. Se registran exclusivamente en `audit_log` con `actor_user_id = NULL` y aparecen en el tab "Historial" del documento como entradas etiquetadas "Sistema · <evento>" (p. ej. "Sistema · OCR completado", "Sistema · Estado recalculado a Vencido"). Esto preserva la integridad semántica de los bloques visibles: "Última actualización" siempre apunta a una persona.
+
 **Estado de cumplimiento**
 
 - **FR-012**: El sistema DEBE calcular y mostrar el estado de cada documento como uno de: vigente, por vencer, vencido o faltante.
 - **FR-012a**: Cada documento cargado DEBE poder ser marcado manualmente como "verificado" por un usuario con permiso, registrando quién verificó, fecha/hora y nota opcional. El estado "verificado" es independiente del estado de vigencia y se muestra como un indicador adicional en el listado y detalle.
+- **FR-012b**: El conjunto de **documentos requeridos** para un proveedor se deriva exclusivamente de su **Tipo de Proveedor**: los `DocumentType` que la asociación `SupplierType ↔ DocumentType` activa para esa industria. Si la asociación define una `periodicity_override`, esa prevalece sobre la periodicidad base del `DocumentType` al calcular la fecha de vencimiento. El estado "Faltante" se evalúa SOLO contra esa lista (no contra todo el catálogo del tenant).
 - **FR-013**: El umbral "por vencer" DEBE ser configurable por organización (por defecto 15 días).
-- **FR-014**: El sistema DEBE mostrar un indicador de cumplimiento agregado por proveedor (porcentaje y conteo por estado) y un tablero general del tenant.
+- **FR-014**: El sistema DEBE mostrar un indicador de cumplimiento agregado por proveedor (porcentaje y conteo por estado) calculado contra los documentos requeridos por su Tipo de Proveedor (FR-012b), y un tablero general del tenant.
 
 **Auditoría y retención (transversal)**
 
@@ -140,7 +167,12 @@ Cualquier usuario del tenant puede ver, en una sola pantalla por proveedor, el e
 - **Usuario**: Persona con acceso al sistema, pertenece a exactamente una organización (en MVP) y tiene un rol. Atributos: nombre, correo, rol, estado.
 - **Proveedor**: Empresa o persona física registrada en el REPSE que presta servicios al tenant. Atributos: razón social, RFC, contacto, estado (activo/inactivo).
 - **Tipo de Documento de Cumplimiento**: Categoría obligatoria o personalizada de documento (p. ej. "Opinión SAT", "ICSOE"). Atributos: nombre, descripción, periodicidad (mensual / bimestral / anual / sin vigencia), origen (catálogo canónico / personalizado del tenant), activo en el tenant. La administración detallada vive en spec 003.
-- **Documento Cargado**: Archivo concreto asociado a un proveedor y un tipo, opcionalmente a un periodo. Atributos: tipo, periodo cubierto, fecha de carga, fecha de vencimiento calculada, fecha de vencimiento efectiva (con posible override manual), estado derivado, datos extraídos por OCR (best-effort: fecha emisión, fecha vigencia, RFC), bandera de verificación manual con usuario/fecha/nota, usuario que cargó, referencia al archivo almacenado, versión.
+- **Tipo de Proveedor (SupplierType)**: Industria o categoría operativa del proveedor (p. ej. "Construcción", "Servicios profesionales", "Transporte"). Atributos: nombre, descripción, origen (`system` para "Sin clasificar" auto-sembrado / `custom` para los creados por el tenant), activo. Cada proveedor referencia exactamente uno. Define qué documentos exige y con qué periodicidad. La administración detallada vive en spec 003 (extendido).
+- **Requisito por Tipo de Proveedor (SupplierTypeDocumentRequirement)**: Asociación entre un `SupplierType` y un `DocumentType` activo en el tenant. Atributos: tipo de proveedor, tipo de documento, periodicidad efectiva (NULL → hereda del `DocumentType`; valor concreto → override), activa. Sin esta asociación, ese tipo de documento NO se exige a los proveedores de ese tipo.
+- **Documento Cargado**: Archivo concreto asociado a un proveedor y un tipo, opcionalmente a un periodo. Atributos: tipo, periodo cubierto, fecha de vencimiento calculada, fecha de vencimiento efectiva (con posible override manual), estado derivado, datos extraídos por OCR (best-effort: fecha emisión, fecha vigencia, RFC), referencia al archivo almacenado, versión, y **tres trazas de auditoría visibles** (FR-011a):
+  - **Agregado**: `uploaded_by` (usuario) + `created_at` (fecha/hora). Inmutable.
+  - **Actualizado**: `last_updated_by` (usuario, nullable) + `last_updated_at` (fecha/hora, nullable). Cubre cualquier cambio posterior al alta.
+  - **Validado**: `verified` (bool) + `verified_by` + `verified_at` + `verified_note`.
 - **Bitácora de Auditoría**: Registro inmutable de acciones relevantes. Atributos: usuario, acción, entidad afectada, fecha/hora, metadatos.
 
 ## Success Criteria *(mandatory)*

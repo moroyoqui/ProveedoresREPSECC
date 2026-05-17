@@ -21,7 +21,10 @@ Fuera de alcance: generación programada (recurrente) de reportes, envío autom�
 
 ## Clarifications
 
-Aplica el bloque de **clarificaciones globales** del spec 001 (sesión 2026-05-16). Ver [`001-repse-compliance-tracker/spec.md#clarifications`](../001-repse-compliance-tracker/spec.md#clarifications). Específicamente: solo el cliente contratante consume reportes (no hay portal de proveedor); los datos respetan el aislamiento multi-tenant.
+Aplica el bloque de **clarificaciones globales** del spec 001 (sesión 2026-05-16). Ver [`001-repse-compliance-tracker/spec.md#clarifications`](../001-repse-compliance-tracker/spec.md#clarifications). Específicamente:
+
+- Solo el cliente contratante consume reportes (no hay portal de proveedor); los datos respetan el aislamiento multi-tenant.
+- **Documentos requeridos por proveedor** = derivados del `SupplierType` y sus `SupplierTypeDocumentRequirement` activos (spec 001 FR-012b). El reporte calcula "Faltante" SOLO contra los `DocumentType` exigidos por el tipo del proveedor; los demás del catálogo del tenant no aparecen como "Faltante".
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -35,9 +38,9 @@ Un usuario abre el detalle de un proveedor y solicita exportar su reporte de cum
 
 **Acceptance Scenarios**:
 
-1. **Given** un proveedor con documentos en distintos estados, **When** el usuario solicita exportar en formato CSV, **Then** recibe un archivo con una fila por documento esperado (incluyendo "Faltante" para los requeridos sin archivo) con columnas: proveedor, RFC, tipo, periodo cubierto, estado, fecha de carga, fecha de vencimiento efectiva, verificado (sí/no, usuario, fecha), enlace al archivo.
+1. **Given** un proveedor con documentos en distintos estados, **When** el usuario solicita exportar en formato CSV, **Then** recibe un archivo con una fila por documento esperado (incluyendo "Faltante" para los requeridos por el `SupplierType` sin archivo) con columnas: proveedor, RFC, **tipo de proveedor**, tipo de documento, periodo cubierto, estado, fecha de carga, fecha de vencimiento efectiva, verificado (sí/no, usuario, fecha), enlace al archivo.
 2. **Given** el mismo proveedor, **When** el usuario solicita exportar en formato PDF, **Then** recibe un archivo con encabezado del tenant, fecha de generación, datos del proveedor y la misma información tabular, con leyendas legibles para impresión.
-3. **Given** un proveedor sin documentos cargados, **When** se exporta, **Then** el archivo se genera mostrando "Faltante" para cada tipo activo requerido por el tenant, sin error.
+3. **Given** un proveedor sin documentos cargados, **When** se exporta, **Then** el archivo se genera mostrando "Faltante" para cada tipo requerido por el `SupplierType` del proveedor, sin error. Los tipos del catálogo del tenant que no exige su `SupplierType` no aparecen en el reporte.
 
 ---
 
@@ -87,7 +90,7 @@ Un usuario solicita, además del CSV/PDF, descargar un ZIP con los archivos orig
 
 - **FR-001**: El sistema DEBE ofrecer exportación del reporte de cumplimiento en al menos dos formatos: **CSV** (para análisis de datos) y **PDF** (para presentación / impresión).
 - **FR-002**: La exportación DEBE soportar tres alcances: (a) un solo proveedor desde su detalle, (b) un conjunto de proveedores resultantes de aplicar filtros al listado, (c) todos los proveedores del tenant.
-- **FR-003**: El CSV DEBE incluir al menos las columnas: proveedor, RFC, tipo de documento, origen del tipo (canónico / personalizado), periodo cubierto, estado (vigente / por vencer / vencido / faltante / tipo inactivo), fecha de carga, fecha de vencimiento efectiva, verificado (sí/no, usuario, fecha), enlace interno al archivo.
+- **FR-003**: El CSV DEBE incluir al menos las columnas: proveedor, RFC, **tipo de proveedor**, tipo de documento, origen del tipo (canónico / personalizado), periodicidad efectiva (mensual/bimestral/anual/sin vigencia, considerando override de la asociación `SupplierType ↔ DocumentType`), periodo cubierto, estado (vigente / por vencer / vencido / faltante / tipo inactivo), fecha de carga, fecha de vencimiento efectiva, verificado (sí/no, usuario, fecha), enlace interno al archivo.
 - **FR-004**: El PDF DEBE incluir: encabezado del tenant (nombre, logo si está configurado), fecha y hora de generación con zona horaria, filtros aplicados, datos del proveedor (o lista de proveedores), tabla de documentos por proveedor, leyenda de colores/estados, número de página y total.
 - **FR-005**: El reporte DEBE reflejar exactamente lo visible en la interfaz para los mismos filtros aplicados al momento de generarse; cero discrepancias.
 - **FR-006**: Si el alcance excede un umbral configurable (por defecto 50 proveedores o 1000 documentos), la generación DEBE ejecutarse asíncronamente y notificar al usuario in-app cuando el archivo esté listo. El enlace de descarga DEBE estar disponible al menos 24 horas.
@@ -96,6 +99,7 @@ Un usuario solicita, además del CSV/PDF, descargar un ZIP con los archivos orig
 - **FR-009**: El sistema DEBE permitir, opcionalmente, **empaquetar los archivos originales en un ZIP** junto con el resumen (CSV o PDF). La estructura del ZIP: resumen en la raíz; una carpeta por proveedor; nombre de archivo dentro de la carpeta = `{tipo}_{periodo}_{fecha-carga}.{ext}`.
 - **FR-010**: La exportación DEBE respetar el aislamiento multi-tenant: ningún reporte puede contener datos de proveedores que no pertenecen al tenant del usuario que lo solicita.
 - **FR-011**: Los tipos de documento desactivados o archivados (spec 003) DEBEN aparecer en el reporte solo si tienen documentos cargados, etiquetados como "tipo inactivo / archivado", y NO DEBEN contar como "Faltante".
+- **FR-011a**: El conjunto de filas "Faltante" para cada proveedor se determina por los `DocumentType` que su `SupplierType` exige (requisitos activos en `SupplierTypeDocumentRequirement`). Si el proveedor está en "Sin clasificar", se exige el catálogo canónico completo del tenant.
 - **FR-012**: Las fechas en el reporte DEBEN renderizarse en la zona horaria del tenant (configurable; por defecto Ciudad de México), e indicar explícitamente la zona en el encabezado.
 
 ### Key Entities
