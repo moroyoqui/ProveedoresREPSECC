@@ -6,6 +6,8 @@
 
 **Updated**: 2026-05-16 — alcance ampliado a tipos de proveedor + asociación de requisitos + plantillas por industria.
 
+**Updated**: 2026-05-17 — wizard "Importar plantilla por industria" REMOVIDO del scope (US5, FR-023..FR-026, entidad Plantilla y SC-003). Postpuesto a una fase posterior. El admin configura tipos de proveedor y sus requisitos manualmente.
+
 **Status**: Draft
 
 **Depends on**: [`001-repse-compliance-tracker`](../001-repse-compliance-tracker/spec.md) (entidades `DocumentType`, `SupplierType`, `SupplierTypeDocumentRequirement` y FR-005a, FR-007, FR-012b del spec 001).
@@ -18,9 +20,7 @@ Permite a cada organización **administrar tres catálogos** que rigen el cumpli
 2. **Catálogo de Tipos de Proveedor**: crear, editar y archivar tipos de proveedor (industrias) propios del tenant.
 3. **Asociación Tipo de Proveedor ↔ Tipos de Documento**: definir qué documentos exige cada tipo de proveedor y con qué periodicidad (heredada del DocumentType o sobreescrita por la asociación).
 
-Además, ofrece un **wizard "Importar plantilla por industria"** que precarga tipos de proveedor canónicos (Construcción, Servicios profesionales, Transporte, Manufactura, Limpieza, Seguridad privada, Outsourcing/Staffing) con sus requisitos típicos, editables tras importar.
-
-Fuera de alcance: gestión del catálogo canónico maestro (lo hace el equipo de producto fuera del MVP), versionado complejo de tipos, periodicidades distintas a {mensual, bimestral, anual, sin vigencia}, compartición de catálogos entre tenants ("marketplace").
+Fuera de alcance: gestión del catálogo canónico maestro (lo hace el equipo de producto fuera del MVP), versionado complejo de tipos, periodicidades distintas a {mensual, bimestral, anual, sin vigencia}, compartición de catálogos entre tenants ("marketplace"), **wizard de importación de plantillas por industria** (postpuesto; el admin configura tipos de proveedor y requisitos manualmente en v1).
 
 ## Clarifications
 
@@ -102,22 +102,6 @@ Un administrador entra al detalle de un `SupplierType` (p. ej. "Construcción") 
 
 ---
 
-### User Story 5 - Importar plantillas por industria (Priority: P2)
-
-Un administrador abre el wizard "Importar plantilla por industria" y elige una o varias plantillas curadas (Construcción, Servicios profesionales, Transporte, Manufactura, Limpieza, Seguridad privada, Outsourcing/Staffing). Cada plantilla precarga un `SupplierType` con un nombre canónico y su lista de requisitos sugeridos. El administrador puede ajustar antes de confirmar.
-
-**Why this priority**: Acelera dramáticamente el time-to-value en onboarding, pero NO es bloqueante: US3 + US4 permiten armar manualmente lo mismo. P2.
-
-**Independent Test**: Importar la plantilla "Construcción"; verificar que aparece un nuevo `SupplierType` "Construcción" con 6-7 requisitos predefinidos y que el cliente puede editarlos antes o después de confirmar.
-
-**Acceptance Scenarios**:
-
-1. **Given** un administrador en la sección de tipos de proveedor, **When** abre el wizard y selecciona "Construcción", **Then** se le muestra una previsualización del tipo a crear y sus requisitos predefinidos (con periodicidad sugerida heredada del `DocumentType`), editable antes de confirmar.
-2. **Given** una plantilla seleccionada que incluye un `DocumentType` actualmente desactivado en el tenant, **When** el administrador confirma la importación, **Then** el sistema avisa que ese requisito quedará inactivo hasta reactivar el tipo de documento y ofrece reactivarlo en el mismo flujo.
-3. **Given** una plantilla ya importada previamente (tipo "Construcción" ya existe), **When** el administrador intenta volver a importarla, **Then** el sistema detecta el conflicto y ofrece (a) cancelar, (b) crear como "Construcción (2)" o (c) mergear los requisitos faltantes al tipo existente sin sobrescribir overrides previos.
-
----
-
 ### Edge Cases
 
 **Tipos de documento (heredados del spec original)**
@@ -141,7 +125,7 @@ Un administrador abre el wizard "Importar plantilla por industria" y elige una o
 
 **A. Catálogo de Tipos de Documento (heredado del spec original, sin cambios funcionales)**
 
-- **FR-001**: El sistema DEBE exponer una sección de "Catálogos" accesible solo a usuarios con rol de administrador del tenant, con tres sub-secciones: "Tipos de documento", "Tipos de proveedor" y "Plantillas".
+- **FR-001**: El sistema DEBE exponer una sección de "Catálogos" accesible solo a usuarios con rol de administrador del tenant, con dos sub-secciones: "Tipos de documento" y "Tipos de proveedor".
 - **FR-002**: La sub-sección "Tipos de documento" DEBE mostrar dos vistas: tipos del **catálogo canónico** y tipos **personalizados** del tenant, diferenciados visualmente.
 - **FR-003**: Un administrador DEBE poder activar o desactivar cualquier tipo del catálogo canónico dentro de su tenant. El cambio NO DEBE afectar a otros tenants.
 - **FR-004**: Un administrador DEBE poder crear tipos personalizados con nombre (texto), periodicidad (mensual / bimestral / anual / sin vigencia) y descripción opcional. La periodicidad debe ser uno de los valores soportados.
@@ -170,20 +154,12 @@ Un administrador abre el wizard "Importar plantilla por industria" y elige una o
 - **FR-021**: NO DEBE permitirse asociar un `DocumentType` desactivado a un `SupplierType`. Si el tipo se desactiva después de crear la asociación, esta queda con bandera "tipo de documento inactivo" y no cuenta como "Faltante" hasta que el tipo se reactive.
 - **FR-022**: Todos los cambios en asociaciones (crear, eliminar, override) DEBEN registrarse en bitácora.
 
-**D. Plantillas por industria (nuevo)**
-
-- **FR-023**: El sistema DEBE ofrecer un wizard "Importar plantilla por industria" con al menos 7 plantillas curadas por el equipo de producto: Construcción, Servicios profesionales, Transporte, Manufactura, Limpieza, Seguridad privada, Outsourcing/Staffing. Cada plantilla define un nombre canónico de `SupplierType` y una lista de requisitos sugeridos con periodicidad por defecto.
-- **FR-024**: Al importar una plantilla, el sistema DEBE permitir editar el nombre, los requisitos y las periodicidades antes de confirmar.
-- **FR-025**: Al importar una plantilla cuyo `SupplierType` con el mismo nombre ya existe en el tenant, el sistema DEBE ofrecer tres opciones: (a) cancelar, (b) crear con nombre alternativo, (c) mergear requisitos faltantes preservando overrides previos.
-- **FR-026**: La importación de plantillas DEBE registrarse en bitácora indicando plantilla, tipo creado/actualizado y requisitos resultantes.
-
 ### Key Entities
 
 - **Asociación Tipo-Tenant (DocumentType activo/inactivo por tenant)**: Vincula un tipo del catálogo canónico con una organización. Atributos: tipo canónico, tenant, activo, fecha último cambio, usuario.
 - **Tipo Personalizado de Documento**: Tipo creado por el tenant. Atributos: nombre, periodicidad, descripción, estado (activo / archivado), tenant propietario.
 - **Tipo de Proveedor (SupplierType)**: Industria del proveedor (p. ej. "Construcción"). Atributos: nombre, descripción, origen (`system` para "Sin clasificar" sembrado / `custom` para los creados por el tenant), estado (activo / archivado), tenant propietario.
 - **Requisito por Tipo de Proveedor (SupplierTypeDocumentRequirement)**: Asociación entre `SupplierType` y `DocumentType`. Atributos: tipo de proveedor, tipo de documento, periodicidad efectiva (NULL = hereda; valor = override), activa, fecha de creación, usuario creador.
-- **Plantilla por Industria (catálogo canónico maestro, fuera del tenant)**: Definida por el equipo de producto. Atributos: slug, nombre, descripción, lista de slugs de DocumentType + periodicidad sugerida. Inmutable desde la UI del tenant; importable como copia editable.
 - Las entidades `DocumentType`, `Supplier`, `Document` y `AuditLog` se definen en spec 001 y son reutilizadas aquí.
 
 ## Success Criteria *(mandatory)*
@@ -192,18 +168,17 @@ Un administrador abre el wizard "Importar plantilla por industria" y elige una o
 
 - **SC-001**: Un administrador puede desactivar tipos de documento no aplicables y crear su primer tipo personalizado en <3 minutos desde abrir la sección por primera vez.
 - **SC-002**: Un administrador puede crear su primer tipo de proveedor + definir 5 requisitos en <5 minutos desde abrir la sección por primera vez.
-- **SC-003**: Un administrador puede importar la plantilla "Construcción" y tener un `SupplierType` totalmente funcional asignable a proveedores en <60 segundos.
-- **SC-004**: El catálogo del tenant A puede ser modificado (en cualquiera de los tres ejes) sin que ningún cambio aparezca en el tenant B, validado en pruebas automatizadas multi-tenant.
-- **SC-005**: 100% de los documentos cargados antes de desactivar/archivar un tipo siguen recuperables y descargables después del cambio.
-- **SC-006**: El indicador de cumplimiento agregado refleja correctamente los cambios de catálogo (cualquiera de los tres ejes) dentro del mismo día sin procesos manuales adicionales.
-- **SC-007**: Cero cambios accidentales al catálogo canónico maestro de documentos ni a las plantillas canónicas de industria desde la UI del tenant.
-- **SC-008**: 100% de las asociaciones que apuntan a `DocumentType` desactivados se manejan correctamente (no cuentan como Faltante, no se aceptan creaciones nuevas, reaparecen al reactivar el tipo), validado en pruebas automatizadas.
+- **SC-003**: El catálogo del tenant A puede ser modificado (en cualquiera de los tres ejes) sin que ningún cambio aparezca en el tenant B, validado en pruebas automatizadas multi-tenant.
+- **SC-004**: 100% de los documentos cargados antes de desactivar/archivar un tipo siguen recuperables y descargables después del cambio.
+- **SC-005**: El indicador de cumplimiento agregado refleja correctamente los cambios de catálogo (cualquiera de los tres ejes) dentro del mismo día sin procesos manuales adicionales.
+- **SC-006**: Cero cambios accidentales al catálogo canónico maestro de documentos desde la UI del tenant.
+- **SC-007**: 100% de las asociaciones que apuntan a `DocumentType` desactivados se manejan correctamente (no cuentan como Faltante, no se aceptan creaciones nuevas, reaparecen al reactivar el tipo), validado en pruebas automatizadas.
 
 ## Assumptions
 
 - Solo el rol "administrador" del tenant puede modificar cualquier catálogo. Roles "gestor" y "consulta" tienen acceso de solo lectura sobre los tres ejes.
-- El catálogo canónico maestro de documentos y las plantillas canónicas de industria los mantiene el equipo de producto fuera del MVP (migraciones / panel interno); este spec no cubre esa interfaz.
+- El catálogo canónico maestro de documentos lo mantiene el equipo de producto fuera del MVP (migraciones / panel interno); este spec no cubre esa interfaz.
 - Las periodicidades disponibles son las fijadas en el spec 001: mensual, bimestral, anual, sin vigencia. Periodicidades adicionales (trimestral, semestral) no se ofrecen en v1.
 - Los tipos personalizados (documento y proveedor) y sus asociaciones existen solo a nivel tenant; no hay compartición entre organizaciones ni marketplace en v1.
-- El número de plantillas canónicas por industria (7) es punto de partida; el equipo puede ampliarlo en releases posteriores sin requerir cambio de spec.
 - La reasignación masiva de proveedores entre tipos (al archivar un tipo) se ofrece como flujo guiado, pero no es bloqueante para el archivado del tipo en sí (se permite archivar dejando proveedores marcados; el admin tiene tareas pendientes en el centro de notificaciones).
+- **Wizard "Importar plantilla por industria"**: postpuesto a una fase posterior. El admin construye los tipos de proveedor manualmente con sus requisitos. Si el feedback de clientes lo prioriza, se reincorpora en un spec dedicado.

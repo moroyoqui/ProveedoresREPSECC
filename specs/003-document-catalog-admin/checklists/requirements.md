@@ -2,6 +2,7 @@
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning
 **Created**: 2026-05-16
+**Updated**: 2026-05-17 — wizard "Importar plantilla por industria" removido del scope (US5, FR-023..FR-026, entidad Plantilla, SC-003).
 **Feature**: [Link to spec.md](../spec.md)
 
 ## Content Quality
@@ -33,4 +34,4 @@
 
 - Depende de spec 001 (entidades base y catálogo canónico precargado).
 - Clarificaciones de la sesión 2026-05-16 (spec 001) aplican por referencia.
-- Decisión a confirmar en `/speckit-plan`: cómo se propagan nuevos tipos canónicos a tenants existentes (FR-012). El spec define la política a alto nivel; el mecanismo es de plan técnico.
+- 2026-05-17: el wizard de plantillas por industria queda postpuesto. El admin construye los tipos de proveedor manualmente con US3 + US4. Si surge demanda validada, se reintroduce como spec dedicado.
