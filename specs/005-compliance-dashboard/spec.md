@@ -12,9 +12,9 @@
 
 ## Scope
 
-Vista analítica de **una sola pantalla** que permite a un usuario del tenant ver el estado de cumplimiento agregado de **todos sus proveedores** con cortes por año, tipo de documento y estado, complementando el indicador por proveedor del spec 001 (que es a nivel detalle). Cubre:
+Vista analítica de **una sola pantalla** que permite a un usuario del tenant ver el estado de cumplimiento agregado de **todos sus proveedores** con cortes por año, tipo de proveedor, tipo de documento y estado, complementando el indicador por proveedor del spec 001 (que es a nivel detalle). Cubre:
 
-- Filtros por **año**, tipo de documento, proveedor, estado y etiqueta.
+- Filtros por **año**, **tipo de proveedor**, tipo de documento, proveedor y estado.
 - **Gráfico de pastel** con el desglose por estado (vigente / por vencer / vencido / faltante).
 - **Gráfico de barras** del cumplimiento por tipo de documento.
 - **KPIs** numéricos: cumplimiento global, proveedores en riesgo, documentos próximos a vencer.
@@ -28,6 +28,7 @@ Aplica el bloque de **clarificaciones globales** del spec 001 (sesión 2026-05-1
 
 - El tablero respeta el aislamiento multi-tenant: solo muestra datos del tenant del usuario logueado.
 - Estados de documento son los definidos en spec 001 FR-012: vigente / por vencer / vencido / faltante. Adicionalmente el tablero reconoce "tipo inactivo" cuando corresponde, según FR-011 del spec 003/004.
+- **Documentos requeridos por proveedor** = derivados del `SupplierType` del proveedor (spec 001 FR-012b). El KPI "proveedor en riesgo", el cálculo de "Faltante" y el cumplimiento agregado se evalúan SOLO contra los requisitos del tipo del proveedor (no contra el catálogo del tenant entero).
 
 ### Session 2026-05-16
 
@@ -122,12 +123,12 @@ Al hacer click sobre una porción del pastel, una barra del gráfico o un KPI, e
 - **FR-002**: La vista por defecto, sin filtros aplicados, DEBE mostrar: año = año calendario en curso, alcance = todos los proveedores activos del tenant, todos los tipos activos del catálogo.
 - **FR-003**: El tablero DEBE contener al menos cuatro componentes visibles sin desplazamiento en pantalla de escritorio: (a) gráfico de **pastel** del desglose por estado de cumplimiento, (b) gráfico de **barras** del cumplimiento por tipo de documento, (c) tira de **KPIs** numéricos, (d) tabla resumen por proveedor con su porcentaje de cumplimiento.
 - **FR-004**: Los KPIs DEBEN incluir como mínimo: porcentaje de cumplimiento global, número de proveedores activos, **número de proveedores en riesgo** (definido en FR-004a), número de documentos por vencer en los próximos 30 días.
-- **FR-004a**: Un **proveedor en riesgo** es un proveedor en estado **activo** que tiene al menos un documento en estado **"Vencido" o "Faltante"** sobre un tipo de documento **activo** en el catálogo del tenant. Proveedores inactivos y tipos desactivados/archivados nunca contribuyen al conteo de riesgo. Esta definición DEBE usarse consistentemente en el KPI, en el drill-down (FR-017) y en las pruebas automatizadas.
+- **FR-004a**: Un **proveedor en riesgo** es un proveedor en estado **activo** que tiene al menos un documento en estado **"Vencido" o "Faltante"** entre los **requisitos exigidos por su `SupplierType`** (asociaciones `SupplierTypeDocumentRequirement` activas que apuntan a `DocumentType` activos). Proveedores inactivos, tipos de documento desactivados/archivados y requisitos retirados no contribuyen al conteo de riesgo. Esta definición DEBE usarse consistentemente en el KPI, en el drill-down (FR-017) y en las pruebas automatizadas.
 
 **Filtros**
 
 - **FR-005**: El tablero DEBE ofrecer un filtro por **año** mediante un selector que liste los años con al menos un documento cargado en el tenant (más el año en curso), con un máximo razonable de 10 años hacia atrás.
-- **FR-006**: El tablero DEBE ofrecer filtros adicionales: **tipo de documento** (multi-selección), **proveedor** (multi-selección con búsqueda por nombre o RFC) y **estado** (multi-selección de los cuatro estados base). El filtro por etiquetas queda explícitamente fuera de alcance hasta que el modelo de datos incorpore esa capacidad.
+- **FR-006**: El tablero DEBE ofrecer filtros adicionales: **tipo de proveedor** (multi-selección, incluye "Sin clasificar"), **tipo de documento** (multi-selección), **proveedor** (multi-selección con búsqueda por nombre o RFC) y **estado** (multi-selección de los cuatro estados base). El filtro por etiquetas queda explícitamente fuera de alcance hasta que el modelo de datos incorpore esa capacidad.
 - **FR-007**: Todos los componentes del tablero DEBEN respetar los filtros aplicados y mostrar conteos consistentes entre sí. La suma del pastel siempre representa el 100% del subconjunto filtrado.
 - **FR-008**: Los filtros DEBEN codificarse en la URL, de manera que recargar la página o compartir el enlace reconstruya exactamente la misma vista.
 - **FR-009**: Un botón "Limpiar filtros" DEBE regresar la vista al estado por defecto (año en curso, sin otros filtros) en una sola acción.
