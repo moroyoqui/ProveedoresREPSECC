@@ -24,7 +24,13 @@ WORKDIR /app
 COPY backend /app
 RUN pip install --upgrade pip && pip install -e ".[dev]"
 
-RUN useradd --create-home --uid 1000 app && chown -R app:app /app
+# Create the unprivileged runtime user and pre-create the upload root with
+# the right ownership so the named volume inherits it on first init.
+RUN useradd --create-home --uid 1000 app \
+ && chown -R app:app /app \
+ && mkdir -p /var/repse/uploads \
+ && chown -R app:app /var/repse \
+ && chmod 700 /var/repse/uploads
 USER app
 
 EXPOSE 8000

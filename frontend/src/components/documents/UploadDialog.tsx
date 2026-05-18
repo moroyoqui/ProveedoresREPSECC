@@ -18,10 +18,15 @@ export function UploadDialog({
   const [coverage, setCoverage] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
 
-  const { data: types } = useQuery({
+  const {
+    data: types,
+    isLoading: typesLoading,
+    error: typesError,
+  } = useQuery({
     queryKey: ["document-types"],
     queryFn: () => documentTypesApi.list(),
   });
+  const activeTypes = (types?.items ?? []).filter((t) => t.active);
 
   const upload = useMutation({
     mutationFn: documentsApi.upload,
@@ -49,12 +54,13 @@ export function UploadDialog({
       return;
     }
     setError(null);
-    upload.mutate({
+    const payload: Parameters<typeof documentsApi.upload>[0] = {
       supplier_id: supplierId,
       document_type_id: docTypeId,
-      coverage_period_start: coverage || undefined,
       file,
-    });
+    };
+    if (coverage) payload.coverage_period_start = coverage;
+    upload.mutate(payload);
   }
 
   return (
@@ -79,17 +85,34 @@ export function UploadDialog({
                 className="mt-1.5 h-10 w-full rounded-md border border-neutral-300 bg-white px-3 text-sm"
                 value={docTypeId ?? ""}
                 onChange={(e) => setDocTypeId(Number(e.target.value) || null)}
+                disabled={typesLoading || activeTypes.length === 0}
                 required
               >
-                <option value="">Selecciona…</option>
-                {types?.items
-                  .filter((t) => t.active)
-                  .map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name}
-                    </option>
-                  ))}
+                <option value="">
+                  {typesLoading
+                    ? "Cargando tipos…"
+                    : activeTypes.length === 0
+                    ? "No hay tipos activos disponibles"
+                    : "Selecciona…"}
+                </option>
+                {activeTypes.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
               </select>
+              {typesError && (
+                <p className="mt-1 text-xs text-status-expired">
+                  No se pudieron cargar los tipos de documento. Refresca la página o vuelve a
+                  iniciar sesión.
+                </p>
+              )}
+              {!typesLoading && !typesError && activeTypes.length === 0 && (
+                <p className="mt-1 text-xs text-neutral-500">
+                  Activa tipos canónicos o crea uno personalizado en Configuración → Tipos de
+                  documento.
+                </p>
+              )}
             </div>
             <FormField
               type="date"
