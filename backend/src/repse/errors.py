@@ -55,6 +55,11 @@ class StaleUpdate(Conflict):
     code = "stale_update"
 
 
+class UnprocessableEntity(AppError):
+    status_code = 422
+    code = "unprocessable_entity"
+
+
 class RateLimited(AppError):
     status_code = 429
     code = "rate_limited"
@@ -84,7 +89,7 @@ def register_exception_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(StarletteHTTPException)
     async def _starlette(_: Request, exc: StarletteHTTPException) -> JSONResponse:
-        code = {401: "unauthenticated", 403: "forbidden", 404: "not_found"}.get(
+        code = {401: "unauthenticated", 403: "forbidden", 404: "not_found", 422: "unprocessable_entity"}.get(
             exc.status_code, "http_error"
         )
         return JSONResponse(

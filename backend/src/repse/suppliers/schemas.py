@@ -53,6 +53,27 @@ class SupplierPatch(BaseModel):
     contact_phone: str | None = Field(None, max_length=32)
     status: SupplierStatus | None = None
     notes: str | None = None
+    # Texto que el usuario debe escribir ("eliminar", case-insensitive, trimmed)
+    # cuando el cambio de supplier_type_id elimina documentos del año en curso
+    # (FR-005b–d spec 001, T125 addendum).
+    confirmation_text: str | None = Field(None, max_length=32)
+
+
+class AffectedDocumentOut(BaseModel):
+    """Resumen de un documento que será eliminado al cambiar el SupplierType."""
+
+    id: int
+    document_type: str
+    coverage_period: str | None
+    due_date_effective: date | None
+
+
+class SupplierTypeChangePreviewOut(BaseModel):
+    """Respuesta de `GET /suppliers/{id}/type-change-preview`."""
+
+    requires_confirmation: bool
+    affected_count: int
+    affected_documents: list[AffectedDocumentOut] = []
 
 
 class SupplierListItem(BaseModel):

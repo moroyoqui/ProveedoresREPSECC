@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 import { useState } from "react";
-import { Upload } from "lucide-react";
+import { Pencil, Upload } from "lucide-react";
 
 import { suppliersApi } from "@/lib/api/index";
 import { Button, Card, CardBody, CardHeader, CardTitle, Table, TBody, TD, TH, THead, TR } from "@/components/ui";
@@ -37,10 +37,18 @@ export function SupplierDetailPage() {
             Tipo: <span className="font-medium">{data.supplier_type.name}</span>
           </p>
         </div>
-        <Button onClick={() => setShowUpload(true)}>
-          <Upload size={16} />
-          Subir documento
-        </Button>
+        <div className="flex gap-2">
+          <Link to={`/suppliers/${data.id}/edit`}>
+            <Button variant="secondary" data-testid="supplier-edit-button">
+              <Pencil size={16} />
+              Editar
+            </Button>
+          </Link>
+          <Button onClick={() => setShowUpload(true)}>
+            <Upload size={16} />
+            Subir documento
+          </Button>
+        </div>
       </header>
 
       <Card className="mb-6">

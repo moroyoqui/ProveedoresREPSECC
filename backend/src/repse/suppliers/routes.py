@@ -11,14 +11,16 @@ from repse.db.session import get_db
 from repse.document_types.models import DocumentType
 from repse.documents.models import Document, DocumentStatus
 from repse.errors import NotFound
-from repse.suppliers import service
+from repse.suppliers import service, type_change_service
 from repse.suppliers.models import Supplier, SupplierStatus
 from repse.suppliers.schemas import (
+    AffectedDocumentOut,
     SupplierDetailOut,
     SupplierIn,
     SupplierListItem,
     SupplierListPage,
     SupplierPatch,
+    SupplierTypeChangePreviewOut,
 )
 from repse.supplier_types.models import (
     RequirementStatus,
@@ -77,6 +79,30 @@ def get_supplier(
     if supplier is None:
         raise NotFound("Supplier not found")
     return _serialize_detail(db, supplier)
+
+
+@router.get(
+    "/{supplier_id}/type-change-preview",
+    response_model=SupplierTypeChangePreviewOut,
+)
+def preview_type_change(
+    supplier_id: int,
+    supplier_type_id: int = Query(..., ge=1),
+    user: CurrentUser = Depends(require_role(Role.ADMIN.value, Role.MANAGER.value)),
+    db: Session = Depends(get_db),
+) -> SupplierTypeChangePreviewOut:
+    preview = type_change_service.preview_destructive_change(
+        db,
+        supplier_id=supplier_id,
+        organization_id=user.organization_id,
+        new_supplier_type_id=supplier_type_id,
+    )
+    payload = type_change_service.to_affected_payload(preview.affected_documents)
+    return SupplierTypeChangePreviewOut(
+        requires_confirmation=preview.requires_confirmation,
+        affected_count=preview.affected_count,
+        affected_documents=[AffectedDocumentOut(**item) for item in payload],
+    )
 
 
 @router.patch("/{supplier_id}", response_model=SupplierDetailOut)
