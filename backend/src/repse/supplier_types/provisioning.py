@@ -1,26 +1,25 @@
 """Bootstrap a new Organization with its default catalog state.
 
-Invoked at the end of the OIDC callback that creates the first user of a new
-tenant. Idempotent: safe to call multiple times.
-
-Concretely:
-    1. Seeds the SupplierType "Sin clasificar" (origin='system').
-    2. Creates a SupplierTypeDocumentRequirement for every active canonical
-       DocumentType, inheriting its periodicity.
-    3. Marks every canonical DocumentType as active in TenantDocumentTypeSetting.
-
-Phase 3 wires the SQLAlchemy models; this module defines the contract so the
-OIDC flow can call it once the models exist.
+Idempotent: safe to call multiple times.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from repse.catalog.canonical import CANONICAL_DOCUMENT_TYPES
+from repse.db.tenant_filter import with_admin_scope
+from repse.document_types.models import DocumentType, DocumentTypeOrigin, DocumentTypeStatus
 from repse.logging import get_logger
+from repse.supplier_types.models import (
+    RequirementStatus,
+    SupplierType,
+    SupplierTypeDocumentRequirement,
+    SupplierTypeOrigin,
+    SupplierTypeStatus,
+)
 
 log = get_logger(__name__)
 
@@ -35,27 +34,68 @@ SYSTEM_SUPPLIER_TYPE_DESCRIPTION = (
 class ProvisioningResult:
     organization_id: int
     sin_clasificar_id: int
-    canonical_doc_types_activated: int
     requirements_created: int
 
 
 def provision_organization(db: Session, organization_id: int) -> ProvisioningResult:
-    """Idempotent provisioning of a tenant's default catalog state.
+    """Seed 'Sin clasificar' SupplierType + requirements for every canonical DocumentType.
 
-    Phase 3 implements the actual ORM operations against `supplier_types`,
-    `supplier_type_document_requirements`, `document_types` and
-    `tenant_document_type_settings`. Until those models exist this function
-    raises NotImplementedError so calling code fails loudly instead of silently
-    leaving a tenant under-provisioned.
+    Skips work that already exists (idempotent). Uses with_admin_scope so the
+    TenantOwned filter doesn't fail before tenant context is set.
     """
-    # Defer the heavy implementation to Phase 3 where the models are defined.
-    raise NotImplementedError(
-        "provision_organization requires Phase 3 models. Wire up once "
-        "SupplierType / SupplierTypeDocumentRequirement / DocumentType / "
-        "TenantDocumentTypeSetting are merged."
-    )
+    with with_admin_scope():
+        sin_clasificar = db.execute(
+            select(SupplierType).where(
+                SupplierType.organization_id == organization_id,
+                SupplierType.origin == SupplierTypeOrigin.SYSTEM,
+            )
+        ).scalar_one_or_none()
 
+        if sin_clasificar is None:
+            sin_clasificar = SupplierType(
+                organization_id=organization_id,
+                name=SYSTEM_SUPPLIER_TYPE_NAME,
+                description=SYSTEM_SUPPLIER_TYPE_DESCRIPTION,
+                origin=SupplierTypeOrigin.SYSTEM,
+                status=SupplierTypeStatus.ACTIVE,
+            )
+            db.add(sin_clasificar)
+            db.flush()
 
-def required_canonical_slugs() -> list[str]:
-    """Canonical slugs that a freshly provisioned tenant must reference."""
-    return [ct.slug for ct in CANONICAL_DOCUMENT_TYPES]
+        canonical_types = db.execute(
+            select(DocumentType).where(
+                DocumentType.origin == DocumentTypeOrigin.CANONICAL,
+                DocumentType.status == DocumentTypeStatus.ACTIVE,
+            )
+        ).scalars().all()
+
+        existing_pairs = {
+            row.document_type_id
+            for row in db.execute(
+                select(SupplierTypeDocumentRequirement).where(
+                    SupplierTypeDocumentRequirement.supplier_type_id == sin_clasificar.id,
+                )
+            ).scalars()
+        }
+
+        created = 0
+        for dt in canonical_types:
+            if dt.id in existing_pairs:
+                continue
+            db.add(
+                SupplierTypeDocumentRequirement(
+                    organization_id=organization_id,
+                    supplier_type_id=sin_clasificar.id,
+                    document_type_id=dt.id,
+                    periodicity_override=None,
+                    status=RequirementStatus.ACTIVE,
+                )
+            )
+            created += 1
+        db.flush()
+
+        return ProvisioningResult(
+            organization_id=organization_id,
+            sin_clasificar_id=sin_clasificar.id,
+            requirements_created=created,
+        )
