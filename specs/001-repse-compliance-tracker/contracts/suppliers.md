@@ -104,14 +104,55 @@ Detalle de un proveedor con su breakdown de documentos por tipo.
   ```
 - **Errores**: `404` si el proveedor no existe o pertenece a otro tenant.
 
+## GET `/api/v1/suppliers/{supplier_id}/type-change-preview`
+
+Vista previa del impacto destructivo de cambiar el `SupplierType` del proveedor (FR-005b spec 001).
+
+- **Auth**: requerida. **Roles**: admin, manager.
+- **Query params**:
+  - `supplier_type_id` (requerido, entero ≥ 1): identificador del tipo objetivo.
+- **Semántica**: identifica los documentos del proveedor cuya `due_date_effective` cae dentro del año natural en curso (zona horaria del tenant). Esos documentos serían eliminados permanentemente al aplicar el cambio.
+- **Respuesta** `200`:
+  ```json
+  {
+    "requires_confirmation": true,
+    "affected_count": 2,
+    "affected_documents": [
+      {
+        "id": 4521,
+        "document_type": "Opinión de cumplimiento SAT",
+        "coverage_period": "2026-04-01 a 2026-04-30",
+        "due_date_effective": "2026-05-31"
+      },
+      {
+        "id": 4811,
+        "document_type": "Opinión IMSS",
+        "coverage_period": "2026-03-01 a 2026-03-31",
+        "due_date_effective": "2026-04-30"
+      }
+    ]
+  }
+  ```
+- **Errores**:
+  - `404 not_found` si el proveedor o el `supplier_type_id` no pertenecen al tenant.
+  - `400 validation_error` si el `SupplierType` está archivado.
+
 ## PATCH `/api/v1/suppliers/{supplier_id}`
 
 Actualiza datos del proveedor (sin tocar RFC; RFC erróneo se corrige por reemplazo administrativo en v1).
 
 - **Auth**: requerida. **Roles**: admin, manager.
-- **Body**: cualquier subconjunto de `legal_name`, `supplier_type_id`, `contact_name`, `contact_email`, `contact_phone`, `status`, `notes`.
-- **Side effect** al cambiar `supplier_type_id`: el sistema recalcula los documentos requeridos y el estado de cumplimiento del proveedor (FR-005a, FR-012b del spec 001) y registra la acción `supplier.type_changed` en bitácora con `prev_supplier_type_id` y `new_supplier_type_id`.
-- **Respuesta** `200`.
+- **Body**: cualquier subconjunto de `legal_name`, `supplier_type_id`, `contact_name`, `contact_email`, `contact_phone`, `status`, `notes`, `confirmation_text`.
+  - `confirmation_text` (opcional): texto literal `"eliminar"` (comparación case-insensitive con `trim`). Requerido cuando el cambio de `supplier_type_id` afectará documentos con `due_date_effective` dentro del año en curso.
+- **Side effect** al cambiar `supplier_type_id`:
+  - Si **no hay documentos afectados**: se aplica el nuevo tipo de inmediato; el sistema recalcula los documentos requeridos y el estado de cumplimiento del proveedor (FR-005a, FR-012b spec 001) y registra `supplier.type_changed` (`destructive=false`).
+  - Si **hay documentos afectados** (al menos uno con `due_date_effective` en el año en curso) y el cliente NO envía `confirmation_text`: la operación se rechaza con `409 confirmation_required` incluyendo `affected_documents` en `error.details`. El estado del proveedor no cambia.
+  - Si **hay documentos afectados** y `confirmation_text` no coincide con `"eliminar"`: la operación se rechaza con `422 invalid_confirmation`.
+  - Si **hay documentos afectados** y `confirmation_text` coincide: la transacción (a) elimina permanentemente los registros + archivos de los documentos afectados, (b) aplica el nuevo `supplier_type_id`, (c) registra `document.deleted_by_supplier_type_change` por cada documento eliminado y `supplier.type_changed` (`destructive=true`).
+- **Respuesta** `200`: detalle del proveedor con el nuevo tipo y `documents_by_type` recalculado.
+- **Errores**:
+  - `409 confirmation_required` cuando el cambio destructivo requiere confirmación.
+  - `422 invalid_confirmation` cuando `confirmation_text` no coincide.
 
 ## DELETE `/api/v1/suppliers/{supplier_id}`
 

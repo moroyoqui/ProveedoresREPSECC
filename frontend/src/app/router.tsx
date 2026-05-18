@@ -11,6 +11,7 @@ import { DocumentTypesPage } from "@/pages/settings/catalogs/document-types";
 import { SupplierTypeDetailPage } from "@/pages/settings/catalogs/supplier-type-detail";
 import { SupplierTypesPage } from "@/pages/settings/catalogs/supplier-types";
 import { SupplierDetailPage } from "@/pages/suppliers/detail";
+import { EditSupplierPage } from "@/pages/suppliers/edit";
 import { SuppliersListPage } from "@/pages/suppliers/list";
 import { NewSupplierPage } from "@/pages/suppliers/new";
 import { UsersListPage } from "@/pages/users/list";
@@ -25,6 +26,7 @@ export function AppRouter() {
           <Route path="suppliers" element={<SuppliersListPage />} />
           <Route path="suppliers/new" element={<NewSupplierPage />} />
           <Route path="suppliers/:id" element={<SupplierDetailPage />} />
+          <Route path="suppliers/:id/edit" element={<EditSupplierPage />} />
           <Route path="documents" element={<Placeholder title="Documentos" />} />
           <Route path="users" element={<UsersListPage />} />
           <Route path="settings" element={<Navigate to="/settings/catalogs" replace />} />

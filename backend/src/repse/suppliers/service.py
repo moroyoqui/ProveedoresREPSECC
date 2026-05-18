@@ -11,8 +11,10 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from repse.audit import actions as audit_actions
 from repse.audit.service import AuditEvent, write_event
-from repse.errors import Conflict, NotFound, ValidationFailure
+from repse.errors import Conflict, NotFound, UnprocessableEntity, ValidationFailure
+from repse.suppliers import type_change_service
 from repse.suppliers.models import Supplier, SupplierStatus
 from repse.suppliers.schemas import SupplierIn, SupplierPatch
 from repse.supplier_types.models import (
@@ -75,7 +77,7 @@ def create_supplier(
         AuditEvent(
             organization_id=organization_id,
             actor_user_id=actor_user_id,
-            action="supplier.created",
+            action=audit_actions.SUPPLIER_CREATED,
             entity_type="supplier",
             entity_id=supplier.id,
             metadata={
@@ -96,9 +98,62 @@ def update_supplier(
     supplier = db.get(Supplier, supplier_id)
     if supplier is None:
         raise NotFound("Supplier not found")
+
+    type_change_requested = (
+        body.supplier_type_id is not None
+        and body.supplier_type_id != supplier.supplier_type_id
+    )
+
+    # Cambio destructivo de SupplierType (FR-005b/c/d spec 001).
+    if type_change_requested:
+        preview = type_change_service.preview_destructive_change(
+            db,
+            supplier_id=supplier.id,
+            organization_id=organization_id,
+            new_supplier_type_id=body.supplier_type_id,  # type: ignore[arg-type]
+        )
+        if preview.requires_confirmation:
+            if body.confirmation_text is None:
+                raise Conflict(
+                    "Confirmation required: this change will permanently delete documents",
+                    details={
+                        "code": "confirmation_required",
+                        "affected_count": preview.affected_count,
+                        "affected_documents": type_change_service.to_affected_payload(
+                            preview.affected_documents
+                        ),
+                    },
+                )
+            if not type_change_service.confirmation_matches(body.confirmation_text):
+                raise UnprocessableEntity(
+                    "Invalid confirmation text",
+                    details={
+                        "code": "invalid_confirmation",
+                        "expected": type_change_service.CONFIRMATION_TEXT_EXPECTED,
+                    },
+                )
+            type_change_service.execute_destructive_change(
+                db,
+                supplier_id=supplier.id,
+                organization_id=organization_id,
+                new_supplier_type_id=body.supplier_type_id,  # type: ignore[arg-type]
+                actor_user_id=actor_user_id,
+            )
+        else:
+            type_change_service.execute_non_destructive_change(
+                db,
+                supplier_id=supplier.id,
+                organization_id=organization_id,
+                new_supplier_type_id=body.supplier_type_id,  # type: ignore[arg-type]
+                actor_user_id=actor_user_id,
+            )
+        # Refresh after the type-change service committed.
+        supplier = db.get(Supplier, supplier_id)
+        if supplier is None:
+            raise NotFound("Supplier not found")
+
     before = {
         "legal_name": supplier.legal_name,
-        "supplier_type_id": supplier.supplier_type_id,
         "status": supplier.status.value,
     }
 
@@ -114,13 +169,9 @@ def update_supplier(
         supplier.notes = body.notes
     if body.status is not None:
         supplier.status = body.status
-    if body.supplier_type_id is not None and body.supplier_type_id != supplier.supplier_type_id:
-        new_st = _resolve_supplier_type(db, organization_id, body.supplier_type_id)
-        supplier.supplier_type_id = new_st.id
 
     after = {
         "legal_name": supplier.legal_name,
-        "supplier_type_id": supplier.supplier_type_id,
         "status": supplier.status.value,
     }
     if before != after:
@@ -129,7 +180,7 @@ def update_supplier(
             AuditEvent(
                 organization_id=organization_id,
                 actor_user_id=actor_user_id,
-                action="supplier.updated",
+                action=audit_actions.SUPPLIER_UPDATED,
                 entity_type="supplier",
                 entity_id=supplier.id,
                 metadata={"before": before, "after": after},
@@ -153,7 +204,7 @@ def deactivate_supplier(
         AuditEvent(
             organization_id=organization_id,
             actor_user_id=actor_user_id,
-            action="supplier.deactivated",
+            action=audit_actions.SUPPLIER_DEACTIVATED,
             entity_type="supplier",
             entity_id=supplier.id,
             metadata={},
@@ -175,7 +226,7 @@ def reactivate_supplier(
         AuditEvent(
             organization_id=organization_id,
             actor_user_id=actor_user_id,
-            action="supplier.reactivated",
+            action=audit_actions.SUPPLIER_REACTIVATED,
             entity_type="supplier",
             entity_id=supplier.id,
             metadata={},

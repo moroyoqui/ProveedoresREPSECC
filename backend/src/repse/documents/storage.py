@@ -72,6 +72,14 @@ class FileStore:
     def open(self, relative_path: str) -> BinaryIO:
         return open(self._abs_path(relative_path), "rb")
 
+    def delete(self, relative_path: str) -> None:
+        """Hard-delete a stored file. Missing path is a no-op."""
+        path = self._abs_path(relative_path)
+        try:
+            os.remove(path)
+        except FileNotFoundError:
+            return
+
     def issue_download_token(
         self, *, file_id: int, user_id: int, organization_id: int
     ) -> str:
