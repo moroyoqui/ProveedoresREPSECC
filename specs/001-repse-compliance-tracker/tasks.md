@@ -28,16 +28,16 @@ Monorepo: `backend/` (FastAPI + SQLAlchemy + Alembic), `frontend/` (Vite + React
 
 **Purpose**: scaffolding inicial del monorepo. Termina con `docker compose up` arrancando una app vacía respondiendo `/health`.
 
-- [ ] T001 Crear estructura de monorepo: `backend/`, `frontend/`, `ops/`, `.gitignore`, `README.md` en raíz.
-- [ ] T002 [P] Inicializar backend Python con `uv` o Poetry en [backend/pyproject.toml](backend/pyproject.toml) declarando deps: `fastapi`, `uvicorn[standard]`, `sqlalchemy>=2.0`, `alembic`, `pymysql`, `pydantic>=2`, `pydantic-settings`, `authlib`, `itsdangerous`, `python-multipart`, `pytesseract`, `pdf2image`, `structlog`, `slowapi`, `prometheus-client`, `sentry-sdk`.
-- [ ] T003 [P] Inicializar frontend con Vite + React + TS en [frontend/package.json](frontend/package.json) declarando deps: `react`, `react-dom`, `react-router-dom`, `@tanstack/react-query`, `tailwindcss`, `@headlessui/react`, `lucide-react`, `react-hook-form`, `zod`.
-- [ ] T004 [P] Configurar Tailwind con tokens de la paleta REPSE (azules profundos + neutros + acentos de estado) en [frontend/tailwind.config.ts](frontend/tailwind.config.ts) y [frontend/src/styles/globals.css](frontend/src/styles/globals.css) (FR-016 del spec).
-- [ ] T005 [P] Configurar lint + format backend: `ruff`, `mypy --strict`, `pytest` en [backend/pyproject.toml](backend/pyproject.toml).
-- [ ] T006 [P] Configurar lint + format frontend: ESLint, Prettier, TypeScript strict en [frontend/tsconfig.json](frontend/tsconfig.json) y [frontend/eslint.config.js](frontend/eslint.config.js).
-- [ ] T007 Crear [ops/docker-compose.yml](ops/docker-compose.yml) con servicios `app` (backend), `frontend` (vite dev), `mysql` (8.0), `caddy` (reverse proxy). Volumen persistente `mysql_data` y `uploads`.
-- [ ] T008 [P] Crear [ops/Caddyfile](ops/Caddyfile) con `tls internal`, proxy `/api/*` → `app:8000`, proxy `/` → `frontend:5173` (dev) o estáticos buildeados (prod).
-- [ ] T009 [P] Crear [ops/.env.example](ops/.env.example) documentando todas las variables del [quickstart.md](./quickstart.md).
-- [ ] T010 Crear endpoint trivial `GET /health` en [backend/src/repse/main.py](backend/src/repse/main.py) que retorna `{"status":"ok"}` para validar el stack arrancando.
+- [X] T001 Crear estructura de monorepo: `backend/`, `frontend/`, `ops/`, `.gitignore`, `README.md` en raíz.
+- [X] T002 [P] Inicializar backend Python con `uv` o Poetry en [backend/pyproject.toml](backend/pyproject.toml) declarando deps: `fastapi`, `uvicorn[standard]`, `sqlalchemy>=2.0`, `alembic`, `pymysql`, `pydantic>=2`, `pydantic-settings`, `authlib`, `itsdangerous`, `python-multipart`, `pytesseract`, `pdf2image`, `structlog`, `slowapi`, `prometheus-client`, `sentry-sdk`.
+- [X] T003 [P] Inicializar frontend con Vite + React + TS en [frontend/package.json](frontend/package.json) declarando deps: `react`, `react-dom`, `react-router-dom`, `@tanstack/react-query`, `tailwindcss`, `@headlessui/react`, `lucide-react`, `react-hook-form`, `zod`.
+- [X] T004 [P] Configurar Tailwind con tokens de la paleta REPSE (azules profundos + neutros + acentos de estado) en [frontend/tailwind.config.ts](frontend/tailwind.config.ts) y [frontend/src/styles/globals.css](frontend/src/styles/globals.css) (FR-016 del spec).
+- [X] T005 [P] Configurar lint + format backend: `ruff`, `mypy --strict`, `pytest` en [backend/pyproject.toml](backend/pyproject.toml).
+- [X] T006 [P] Configurar lint + format frontend: ESLint, Prettier, TypeScript strict en [frontend/tsconfig.json](frontend/tsconfig.json) y [frontend/eslint.config.js](frontend/eslint.config.js).
+- [X] T007 Crear [ops/docker-compose.yml](ops/docker-compose.yml) con servicios `app` (backend), `frontend` (vite dev), `mysql` (8.0), `caddy` (reverse proxy). Volumen persistente `mysql_data` y `uploads`.
+- [X] T008 [P] Crear [ops/Caddyfile](ops/Caddyfile) con `tls internal`, proxy `/api/*` → `app:8000`, proxy `/` → `frontend:5173` (dev) o estáticos buildeados (prod).
+- [X] T009 [P] Crear [ops/.env.example](ops/.env.example) documentando todas las variables del [quickstart.md](./quickstart.md).
+- [X] T010 Crear endpoint trivial `GET /health` en [backend/src/repse/main.py](backend/src/repse/main.py) que retorna `{"status":"ok"}` para validar el stack arrancando.
 
 **Checkpoint**: `docker compose up` levanta la app, `curl https://localhost/api/health` responde 200, frontend monta vacío.
 
@@ -49,29 +49,29 @@ Monorepo: `backend/` (FastAPI + SQLAlchemy + Alembic), `frontend/` (Vite + React
 
 **⚠️ CRITICAL**: ninguna user story puede empezar hasta cerrar esta fase.
 
-- [ ] T011 Crear configuración Pydantic Settings en [backend/src/repse/config.py](backend/src/repse/config.py) cargando todas las variables de entorno del [quickstart.md](./quickstart.md) (DB, OIDC, APP_SECRET, UPLOAD_ROOT, TESSERACT_LANG, SENTRY_DSN).
-- [ ] T012 [P] Configurar structlog (JSON renderer, request_id/tenant_id/user_id context) en [backend/src/repse/logging.py](backend/src/repse/logging.py).
-- [ ] T013 [P] Setup global de Sentry/GlitchTip (opt-in vía `SENTRY_DSN` vacío = deshabilitado) en [backend/src/repse/main.py](backend/src/repse/main.py).
-- [ ] T014 Crear SQLAlchemy `DeclarativeBase` con naming convention determinista (research.md §2) en [backend/src/repse/db/base.py](backend/src/repse/db/base.py).
-- [ ] T015 Crear session factory + async/sync engine + dependency `get_db` en [backend/src/repse/db/session.py](backend/src/repse/db/session.py).
-- [ ] T016 Implementar mixin `TenantOwned` + event listener `before_compile` que inyecta `WHERE organization_id = :current_tenant_id` (research.md §2) en [backend/src/repse/db/tenant_filter.py](backend/src/repse/db/tenant_filter.py).
-- [ ] T017 Inicializar Alembic + configurar `env.py` para descubrir todos los modelos del paquete `repse.*` en [backend/alembic.ini](backend/alembic.ini), [backend/alembic/env.py](backend/alembic/env.py), [backend/alembic/script.py.mako](backend/alembic/script.py.mako).
-- [ ] T018 [P] Implementar middleware de request ID + structlog binding en [backend/src/repse/middleware/request_context.py](backend/src/repse/middleware/request_context.py).
-- [ ] T019 [P] Implementar rate limiting con `slowapi` (10 req/min para auth callback, 60/min para uploads) en [backend/src/repse/middleware/rate_limit.py](backend/src/repse/middleware/rate_limit.py).
-- [ ] T020 [P] Implementar envelope de errores `{"error": {"code", "message", "details"}}` y exception handler global en [backend/src/repse/errors.py](backend/src/repse/errors.py).
-- [ ] T021 [P] Implementar `FileStore` con backend `LocalDisk` + tokens JWS firmados con `itsdangerous` (TTL 5 min, validan organization_id) en [backend/src/repse/documents/storage.py](backend/src/repse/documents/storage.py).
-- [ ] T022 [P] Implementar wrapper de Tesseract OCR con `pytesseract` + `pdf2image` (regex de RFC + fechas en español) en [backend/src/repse/documents/ocr.py](backend/src/repse/documents/ocr.py).
-- [ ] T023 [P] Implementar calculadora de vencimiento `compute_due_date(coverage_period, periodicity)` con reglas SAT/IMSS (research.md §3) en [backend/src/repse/documents/expiration.py](backend/src/repse/documents/expiration.py).
-- [ ] T024 Implementar bootstrap de catálogo canónico de `DocumentType` (research.md §9) como migration data-only en [backend/alembic/versions/0002_seed_canonical_doc_types.py](backend/alembic/versions/0002_seed_canonical_doc_types.py).
-- [ ] T025 Implementar provisioning de Organization: crea `SupplierType` "Sin clasificar" (`origin='system'`) + siembra `SupplierTypeDocumentRequirement` para todos los `DocumentType` canónicos activos (FR-013 del spec 003) en [backend/src/repse/supplier_types/provisioning.py](backend/src/repse/supplier_types/provisioning.py).
-- [ ] T026 Implementar clients OIDC (Google + Microsoft) con `Authlib` en [backend/src/repse/auth/oidc.py](backend/src/repse/auth/oidc.py).
-- [ ] T027 Implementar gestión de sesión + cookie firmada con `itsdangerous` en [backend/src/repse/auth/session.py](backend/src/repse/auth/session.py).
-- [ ] T028 Implementar dependencies `current_user`, `current_tenant`, `require_role(*roles)` en [backend/src/repse/auth/dependencies.py](backend/src/repse/auth/dependencies.py).
-- [ ] T029 [P] Implementar servicio de bitácora `audit_log.write(action, entity_type, entity_id, metadata)` + helper para acciones del sistema (`actor_user_id=NULL`) en [backend/src/repse/audit/service.py](backend/src/repse/audit/service.py).
-- [ ] T030 [P] Implementar endpoint `/metrics` con `prometheus_client` (request_count, latency_histogram, error_rate) en [backend/src/repse/observability/metrics.py](backend/src/repse/observability/metrics.py).
-- [ ] T031 [P] Frontend: configurar React Router + Tanstack Query + AuthProvider + ThemeProvider en [frontend/src/app/providers.tsx](frontend/src/app/providers.tsx) y [frontend/src/app/router.tsx](frontend/src/app/router.tsx).
-- [ ] T032 [P] Frontend: implementar fetch wrapper con manejo de cookies de sesión, errores y refresco automático en [frontend/src/lib/api.ts](frontend/src/lib/api.ts).
-- [ ] T033 [P] Frontend: componentes UI primitivos (`Button`, `Card`, `Badge`, `Table`, `Modal`, `Tabs`, `FormField`) en [frontend/src/components/ui/](frontend/src/components/ui/).
+- [X] T011 Crear configuración Pydantic Settings en [backend/src/repse/config.py](backend/src/repse/config.py) cargando todas las variables de entorno del [quickstart.md](./quickstart.md) (DB, OIDC, APP_SECRET, UPLOAD_ROOT, TESSERACT_LANG, SENTRY_DSN).
+- [X] T012 [P] Configurar structlog (JSON renderer, request_id/tenant_id/user_id context) en [backend/src/repse/logging.py](backend/src/repse/logging.py).
+- [X] T013 [P] Setup global de Sentry/GlitchTip (opt-in vía `SENTRY_DSN` vacío = deshabilitado) en [backend/src/repse/main.py](backend/src/repse/main.py).
+- [X] T014 Crear SQLAlchemy `DeclarativeBase` con naming convention determinista (research.md §2) en [backend/src/repse/db/base.py](backend/src/repse/db/base.py).
+- [X] T015 Crear session factory + async/sync engine + dependency `get_db` en [backend/src/repse/db/session.py](backend/src/repse/db/session.py).
+- [X] T016 Implementar mixin `TenantOwned` + event listener `before_compile` que inyecta `WHERE organization_id = :current_tenant_id` (research.md §2) en [backend/src/repse/db/tenant_filter.py](backend/src/repse/db/tenant_filter.py).
+- [X] T017 Inicializar Alembic + configurar `env.py` para descubrir todos los modelos del paquete `repse.*` en [backend/alembic.ini](backend/alembic.ini), [backend/alembic/env.py](backend/alembic/env.py), [backend/alembic/script.py.mako](backend/alembic/script.py.mako).
+- [X] T018 [P] Implementar middleware de request ID + structlog binding en [backend/src/repse/middleware/request_context.py](backend/src/repse/middleware/request_context.py).
+- [X] T019 [P] Implementar rate limiting con `slowapi` (10 req/min para auth callback, 60/min para uploads) en [backend/src/repse/middleware/rate_limit.py](backend/src/repse/middleware/rate_limit.py).
+- [X] T020 [P] Implementar envelope de errores `{"error": {"code", "message", "details"}}` y exception handler global en [backend/src/repse/errors.py](backend/src/repse/errors.py).
+- [X] T021 [P] Implementar `FileStore` con backend `LocalDisk` + tokens JWS firmados con `itsdangerous` (TTL 5 min, validan organization_id) en [backend/src/repse/documents/storage.py](backend/src/repse/documents/storage.py).
+- [X] T022 [P] Implementar wrapper de Tesseract OCR con `pytesseract` + `pdf2image` (regex de RFC + fechas en español) en [backend/src/repse/documents/ocr.py](backend/src/repse/documents/ocr.py).
+- [X] T023 [P] Implementar calculadora de vencimiento `compute_due_date(coverage_period, periodicity)` con reglas SAT/IMSS (research.md §3) en [backend/src/repse/documents/expiration.py](backend/src/repse/documents/expiration.py).
+- [X] T024 Implementar bootstrap de catálogo canónico de `DocumentType` (research.md §9) como migration data-only en [backend/alembic/versions/0002_seed_canonical_doc_types.py](backend/alembic/versions/0002_seed_canonical_doc_types.py).
+- [X] T025 Implementar provisioning de Organization: crea `SupplierType` "Sin clasificar" (`origin='system'`) + siembra `SupplierTypeDocumentRequirement` para todos los `DocumentType` canónicos activos (FR-013 del spec 003) en [backend/src/repse/supplier_types/provisioning.py](backend/src/repse/supplier_types/provisioning.py).
+- [X] T026 Implementar clients OIDC (Google + Microsoft) con `Authlib` en [backend/src/repse/auth/oidc.py](backend/src/repse/auth/oidc.py).
+- [X] T027 Implementar gestión de sesión + cookie firmada con `itsdangerous` en [backend/src/repse/auth/session.py](backend/src/repse/auth/session.py).
+- [X] T028 Implementar dependencies `current_user`, `current_tenant`, `require_role(*roles)` en [backend/src/repse/auth/dependencies.py](backend/src/repse/auth/dependencies.py).
+- [X] T029 [P] Implementar servicio de bitácora `audit_log.write(action, entity_type, entity_id, metadata)` + helper para acciones del sistema (`actor_user_id=NULL`) en [backend/src/repse/audit/service.py](backend/src/repse/audit/service.py).
+- [X] T030 [P] Implementar endpoint `/metrics` con `prometheus_client` (request_count, latency_histogram, error_rate) en [backend/src/repse/observability/metrics.py](backend/src/repse/observability/metrics.py).
+- [X] T031 [P] Frontend: configurar React Router + Tanstack Query + AuthProvider + ThemeProvider en [frontend/src/app/providers.tsx](frontend/src/app/providers.tsx) y [frontend/src/app/router.tsx](frontend/src/app/router.tsx).
+- [X] T032 [P] Frontend: implementar fetch wrapper con manejo de cookies de sesión, errores y refresco automático en [frontend/src/lib/api.ts](frontend/src/lib/api.ts).
+- [X] T033 [P] Frontend: componentes UI primitivos (`Button`, `Card`, `Badge`, `Table`, `Modal`, `Tabs`, `FormField`) en [frontend/src/components/ui/](frontend/src/components/ui/).
 
 **Checkpoint**: capa de datos lista, OIDC conectable, multi-tenant filter activo, OCR/expiration/file storage probables; user stories pueden empezar.
 
@@ -87,86 +87,86 @@ Monorepo: `backend/` (FastAPI + SQLAlchemy + Alembic), `frontend/` (Vite + React
 
 > **NOTE**: estos tests se escriben PRIMERO y deben fallar antes de implementar (constitución, principio III).
 
-- [ ] T034 [P] [US1] Contract test: `POST /api/v1/auth/callback/{provider}` valida `state`, emite cookie de sesión y persiste user/organization en [backend/tests/contract/test_auth_contract.py](backend/tests/contract/test_auth_contract.py).
-- [ ] T035 [P] [US1] Contract test: `GET /api/v1/auth/me` retorna 401 sin sesión y perfil con `organization` con sesión en [backend/tests/contract/test_auth_contract.py](backend/tests/contract/test_auth_contract.py).
-- [ ] T036 [P] [US1] Contract test: `POST /api/v1/suppliers` valida payload, asigna "Sin clasificar" si falta `supplier_type_id`, rechaza RFC duplicado por org (`409 rfc_exists`) en [backend/tests/contract/test_suppliers_contract.py](backend/tests/contract/test_suppliers_contract.py).
-- [ ] T037 [P] [US1] Contract test: `POST /api/v1/suppliers/{id}/documents` acepta multipart con PDF, valida tipo activo, computa `due_date_calculated`, registra `audit.added` en [backend/tests/contract/test_documents_contract.py](backend/tests/contract/test_documents_contract.py).
-- [ ] T038 [P] [US1] Integration test multi-tenant negativo: org A no puede GET/POST documentos de org B (responde 404 nunca 403) en [backend/tests/integration/test_tenant_isolation.py](backend/tests/integration/test_tenant_isolation.py).
-- [ ] T039 [P] [US1] Integration test: subir un duplicado exacto (mismo sha256) en el mismo tenant responde `409 duplicate_file` con `id` del existente en [backend/tests/integration/test_documents_upload.py](backend/tests/integration/test_documents_upload.py).
+- [X] T034 [P] [US1] Contract test: `POST /api/v1/auth/callback/{provider}` valida `state`, emite cookie de sesión y persiste user/organization en [backend/tests/contract/test_auth_contract.py](backend/tests/contract/test_auth_contract.py).
+- [X] T035 [P] [US1] Contract test: `GET /api/v1/auth/me` retorna 401 sin sesión y perfil con `organization` con sesión en [backend/tests/contract/test_auth_contract.py](backend/tests/contract/test_auth_contract.py).
+- [X] T036 [P] [US1] Contract test: `POST /api/v1/suppliers` valida payload, asigna "Sin clasificar" si falta `supplier_type_id`, rechaza RFC duplicado por org (`409 rfc_exists`) en [backend/tests/contract/test_suppliers_contract.py](backend/tests/contract/test_suppliers_contract.py).
+- [X] T037 [P] [US1] Contract test: `POST /api/v1/suppliers/{id}/documents` acepta multipart con PDF, valida tipo activo, computa `due_date_calculated`, registra `audit.added` en [backend/tests/contract/test_documents_contract.py](backend/tests/contract/test_documents_contract.py).
+- [X] T038 [P] [US1] Integration test multi-tenant negativo: org A no puede GET/POST documentos de org B (responde 404 nunca 403) en [backend/tests/integration/test_tenant_isolation.py](backend/tests/integration/test_tenant_isolation.py).
+- [X] T039 [P] [US1] Integration test: subir un duplicado exacto (mismo sha256) en el mismo tenant responde `409 duplicate_file` con `id` del existente en [backend/tests/integration/test_documents_upload.py](backend/tests/integration/test_documents_upload.py).
 
 ### Models (paralelos, archivos distintos)
 
-- [ ] T040 [P] [US1] Modelo `Organization` con columnas y enum `status` (active/grace/deleted) en [backend/src/repse/organizations/models.py](backend/src/repse/organizations/models.py).
-- [ ] T041 [P] [US1] Modelo `User` con `oidc_subject`, `oidc_provider`, `role`, mixin `TenantOwned` en [backend/src/repse/users/models.py](backend/src/repse/users/models.py).
-- [ ] T042 [P] [US1] Modelo `SupplierType` con `origin` (system/custom), `status` (active/archived), `TenantOwned` en [backend/src/repse/supplier_types/models.py](backend/src/repse/supplier_types/models.py).
-- [ ] T043 [P] [US1] Modelo `SupplierTypeDocumentRequirement` con `periodicity_override`, `status` (active/retired), FK a `SupplierType` y `DocumentType` en [backend/src/repse/supplier_types/models.py](backend/src/repse/supplier_types/models.py).
-- [ ] T044 [P] [US1] Modelo `DocumentType` con `slug`, `periodicity`, `origin` (canonical/custom), `organization_id` nullable (canónicos NULL) en [backend/src/repse/document_types/models.py](backend/src/repse/document_types/models.py).
-- [ ] T045 [P] [US1] Modelo `TenantDocumentTypeSetting` (activación canónico por tenant) en [backend/src/repse/document_types/models.py](backend/src/repse/document_types/models.py).
-- [ ] T046 [P] [US1] Modelo `Supplier` con FK `supplier_type_id` NOT NULL, `TenantOwned` en [backend/src/repse/suppliers/models.py](backend/src/repse/suppliers/models.py).
-- [ ] T047 [P] [US1] Modelo `Document` con todas las columnas del data-model: `due_date_calculated`, `due_date_effective`, `verified*`, `last_updated_*`, `ocr_*`, `version`, `is_latest`, `TenantOwned` en [backend/src/repse/documents/models.py](backend/src/repse/documents/models.py).
-- [ ] T048 [P] [US1] Modelo `AuditLog` append-only en [backend/src/repse/audit/models.py](backend/src/repse/audit/models.py).
-- [ ] T049 [US1] Migration Alembic `0001_baseline.py` que crea todas las tablas anteriores con índices del data-model (`uq_*`, `ix_*`) en [backend/alembic/versions/0001_baseline.py](backend/alembic/versions/0001_baseline.py).
+- [X] T040 [P] [US1] Modelo `Organization` con columnas y enum `status` (active/grace/deleted) en [backend/src/repse/organizations/models.py](backend/src/repse/organizations/models.py).
+- [X] T041 [P] [US1] Modelo `User` con `oidc_subject`, `oidc_provider`, `role`, mixin `TenantOwned` en [backend/src/repse/users/models.py](backend/src/repse/users/models.py).
+- [X] T042 [P] [US1] Modelo `SupplierType` con `origin` (system/custom), `status` (active/archived), `TenantOwned` en [backend/src/repse/supplier_types/models.py](backend/src/repse/supplier_types/models.py).
+- [X] T043 [P] [US1] Modelo `SupplierTypeDocumentRequirement` con `periodicity_override`, `status` (active/retired), FK a `SupplierType` y `DocumentType` en [backend/src/repse/supplier_types/models.py](backend/src/repse/supplier_types/models.py).
+- [X] T044 [P] [US1] Modelo `DocumentType` con `slug`, `periodicity`, `origin` (canonical/custom), `organization_id` nullable (canónicos NULL) en [backend/src/repse/document_types/models.py](backend/src/repse/document_types/models.py).
+- [X] T045 [P] [US1] Modelo `TenantDocumentTypeSetting` (activación canónico por tenant) en [backend/src/repse/document_types/models.py](backend/src/repse/document_types/models.py).
+- [X] T046 [P] [US1] Modelo `Supplier` con FK `supplier_type_id` NOT NULL, `TenantOwned` en [backend/src/repse/suppliers/models.py](backend/src/repse/suppliers/models.py).
+- [X] T047 [P] [US1] Modelo `Document` con todas las columnas del data-model: `due_date_calculated`, `due_date_effective`, `verified*`, `last_updated_*`, `ocr_*`, `version`, `is_latest`, `TenantOwned` en [backend/src/repse/documents/models.py](backend/src/repse/documents/models.py).
+- [X] T048 [P] [US1] Modelo `AuditLog` append-only en [backend/src/repse/audit/models.py](backend/src/repse/audit/models.py).
+- [X] T049 [US1] Migration Alembic `0001_baseline.py` que crea todas las tablas anteriores con índices del data-model (`uq_*`, `ix_*`) en [backend/alembic/versions/0001_baseline.py](backend/alembic/versions/0001_baseline.py).
 
 ### Pydantic schemas
 
-- [ ] T050 [P] [US1] Schemas Pydantic para Organization (`OrganizationOut`, `OrganizationPatch`) en [backend/src/repse/organizations/schemas.py](backend/src/repse/organizations/schemas.py).
-- [ ] T051 [P] [US1] Schemas para User (`UserOut`, `UserCreate`, `UserPatch`) en [backend/src/repse/users/schemas.py](backend/src/repse/users/schemas.py).
-- [ ] T052 [P] [US1] Schemas para SupplierType (`SupplierTypeOut`, `SupplierTypeListItem`) en [backend/src/repse/supplier_types/schemas.py](backend/src/repse/supplier_types/schemas.py).
-- [ ] T053 [P] [US1] Schemas para DocumentType (`DocumentTypeOut`) en [backend/src/repse/document_types/schemas.py](backend/src/repse/document_types/schemas.py).
-- [ ] T054 [P] [US1] Schemas para Supplier (`SupplierIn`, `SupplierOut`, `SupplierDetailOut` con `documents_by_type`, `SupplierPatch`) en [backend/src/repse/suppliers/schemas.py](backend/src/repse/suppliers/schemas.py).
-- [ ] T055 [P] [US1] Schemas para Document (`DocumentOut` con bloque `audit` `{added, last_updated, validated}`, `DocumentUploadIn`) en [backend/src/repse/documents/schemas.py](backend/src/repse/documents/schemas.py).
+- [X] T050 [P] [US1] Schemas Pydantic para Organization (`OrganizationOut`, `OrganizationPatch`) en [backend/src/repse/organizations/schemas.py](backend/src/repse/organizations/schemas.py).
+- [X] T051 [P] [US1] Schemas para User (`UserOut`, `UserCreate`, `UserPatch`) en [backend/src/repse/users/schemas.py](backend/src/repse/users/schemas.py).
+- [X] T052 [P] [US1] Schemas para SupplierType (`SupplierTypeOut`, `SupplierTypeListItem`) en [backend/src/repse/supplier_types/schemas.py](backend/src/repse/supplier_types/schemas.py).
+- [X] T053 [P] [US1] Schemas para DocumentType (`DocumentTypeOut`) en [backend/src/repse/document_types/schemas.py](backend/src/repse/document_types/schemas.py).
+- [X] T054 [P] [US1] Schemas para Supplier (`SupplierIn`, `SupplierOut`, `SupplierDetailOut` con `documents_by_type`, `SupplierPatch`) en [backend/src/repse/suppliers/schemas.py](backend/src/repse/suppliers/schemas.py).
+- [X] T055 [P] [US1] Schemas para Document (`DocumentOut` con bloque `audit` `{added, last_updated, validated}`, `DocumentUploadIn`) en [backend/src/repse/documents/schemas.py](backend/src/repse/documents/schemas.py).
 
 ### Auth endpoints
 
-- [ ] T056 [US1] Endpoint `GET /api/v1/auth/login/{provider}` (Google/Microsoft) en [backend/src/repse/auth/routes.py](backend/src/repse/auth/routes.py).
-- [ ] T057 [US1] Endpoint `GET /api/v1/auth/callback/{provider}`: valida state, crea/recupera User, dispara provisioning Organization si es primer login (T025), emite cookie sesión en [backend/src/repse/auth/routes.py](backend/src/repse/auth/routes.py).
-- [ ] T058 [US1] Endpoint `POST /api/v1/auth/logout` invalida cookie en [backend/src/repse/auth/routes.py](backend/src/repse/auth/routes.py).
-- [ ] T059 [US1] Endpoint `GET /api/v1/auth/me` retorna perfil + organization en [backend/src/repse/auth/routes.py](backend/src/repse/auth/routes.py).
+- [X] T056 [US1] Endpoint `GET /api/v1/auth/login/{provider}` (Google/Microsoft) en [backend/src/repse/auth/routes.py](backend/src/repse/auth/routes.py).
+- [X] T057 [US1] Endpoint `GET /api/v1/auth/callback/{provider}`: valida state, crea/recupera User, dispara provisioning Organization si es primer login (T025), emite cookie sesión en [backend/src/repse/auth/routes.py](backend/src/repse/auth/routes.py).
+- [X] T058 [US1] Endpoint `POST /api/v1/auth/logout` invalida cookie en [backend/src/repse/auth/routes.py](backend/src/repse/auth/routes.py).
+- [X] T059 [US1] Endpoint `GET /api/v1/auth/me` retorna perfil + organization en [backend/src/repse/auth/routes.py](backend/src/repse/auth/routes.py).
 
 ### Organization & users endpoints
 
-- [ ] T060 [P] [US1] Endpoint `GET /api/v1/organization` y `PATCH /api/v1/organization` (admin only) en [backend/src/repse/organizations/routes.py](backend/src/repse/organizations/routes.py).
-- [ ] T061 [P] [US1] Endpoints CRUD `GET/POST/PATCH/DELETE /api/v1/users` con regla "no dejar al tenant sin admins" (409 `last_admin`) en [backend/src/repse/users/routes.py](backend/src/repse/users/routes.py).
+- [X] T060 [P] [US1] Endpoint `GET /api/v1/organization` y `PATCH /api/v1/organization` (admin only) en [backend/src/repse/organizations/routes.py](backend/src/repse/organizations/routes.py).
+- [X] T061 [P] [US1] Endpoints CRUD `GET/POST/PATCH/DELETE /api/v1/users` con regla "no dejar al tenant sin admins" (409 `last_admin`) en [backend/src/repse/users/routes.py](backend/src/repse/users/routes.py).
 
 ### SupplierType endpoints (solo lectura, escritura en spec 003)
 
-- [ ] T062 [P] [US1] Endpoint `GET /api/v1/supplier-types` (lista del tenant) en [backend/src/repse/supplier_types/routes.py](backend/src/repse/supplier_types/routes.py).
-- [ ] T063 [P] [US1] Endpoint `GET /api/v1/supplier-types/{id}` (con `include_requirements`) en [backend/src/repse/supplier_types/routes.py](backend/src/repse/supplier_types/routes.py).
+- [X] T062 [P] [US1] Endpoint `GET /api/v1/supplier-types` (lista del tenant) en [backend/src/repse/supplier_types/routes.py](backend/src/repse/supplier_types/routes.py).
+- [X] T063 [P] [US1] Endpoint `GET /api/v1/supplier-types/{id}` (con `include_requirements`) en [backend/src/repse/supplier_types/routes.py](backend/src/repse/supplier_types/routes.py).
 
 ### DocumentType endpoints
 
-- [ ] T064 [P] [US1] Endpoints `GET /api/v1/document-types` y `GET /api/v1/document-types/{id}` (lectura, filtrando activos por defecto) en [backend/src/repse/document_types/routes.py](backend/src/repse/document_types/routes.py).
+- [X] T064 [P] [US1] Endpoints `GET /api/v1/document-types` y `GET /api/v1/document-types/{id}` (lectura, filtrando activos por defecto) en [backend/src/repse/document_types/routes.py](backend/src/repse/document_types/routes.py).
 
 ### Supplier CRUD
 
-- [ ] T065 [US1] Servicio `suppliers.service`: crear (asigna "Sin clasificar" si falta `supplier_type_id`), validar RFC único por org, registrar audit log, recalcular cumplimiento al cambiar tipo (FR-005a) en [backend/src/repse/suppliers/service.py](backend/src/repse/suppliers/service.py).
-- [ ] T066 [US1] Endpoint `POST /api/v1/suppliers` en [backend/src/repse/suppliers/routes.py](backend/src/repse/suppliers/routes.py).
-- [ ] T067 [US1] Endpoint `GET /api/v1/suppliers` con filtros (`q`, `status`, `supplier_type_id`, `sort`) y paginación cursor-based en [backend/src/repse/suppliers/routes.py](backend/src/repse/suppliers/routes.py).
-- [ ] T068 [US1] Endpoint `GET /api/v1/suppliers/{id}` que devuelve `SupplierDetailOut` con `documents_by_type` (resolviendo requirements según `SupplierType` + último Document por tipo+periodo) en [backend/src/repse/suppliers/routes.py](backend/src/repse/suppliers/routes.py).
-- [ ] T069 [US1] Endpoint `PATCH /api/v1/suppliers/{id}` (cambio de tipo dispara recálculo) en [backend/src/repse/suppliers/routes.py](backend/src/repse/suppliers/routes.py).
-- [ ] T070 [US1] Endpoints `DELETE /api/v1/suppliers/{id}` (soft-delete) y `POST /api/v1/suppliers/{id}/reactivate` en [backend/src/repse/suppliers/routes.py](backend/src/repse/suppliers/routes.py).
+- [X] T065 [US1] Servicio `suppliers.service`: crear (asigna "Sin clasificar" si falta `supplier_type_id`), validar RFC único por org, registrar audit log, recalcular cumplimiento al cambiar tipo (FR-005a) en [backend/src/repse/suppliers/service.py](backend/src/repse/suppliers/service.py).
+- [X] T066 [US1] Endpoint `POST /api/v1/suppliers` en [backend/src/repse/suppliers/routes.py](backend/src/repse/suppliers/routes.py).
+- [X] T067 [US1] Endpoint `GET /api/v1/suppliers` con filtros (`q`, `status`, `supplier_type_id`, `sort`) y paginación cursor-based en [backend/src/repse/suppliers/routes.py](backend/src/repse/suppliers/routes.py).
+- [X] T068 [US1] Endpoint `GET /api/v1/suppliers/{id}` que devuelve `SupplierDetailOut` con `documents_by_type` (resolviendo requirements según `SupplierType` + último Document por tipo+periodo) en [backend/src/repse/suppliers/routes.py](backend/src/repse/suppliers/routes.py).
+- [X] T069 [US1] Endpoint `PATCH /api/v1/suppliers/{id}` (cambio de tipo dispara recálculo) en [backend/src/repse/suppliers/routes.py](backend/src/repse/suppliers/routes.py).
+- [X] T070 [US1] Endpoints `DELETE /api/v1/suppliers/{id}` (soft-delete) y `POST /api/v1/suppliers/{id}/reactivate` en [backend/src/repse/suppliers/routes.py](backend/src/repse/suppliers/routes.py).
 
 ### Document upload
 
-- [ ] T071 [US1] Servicio `documents.upload`: orquesta validación de mime/tamaño, dedup por sha256, cálculo de `due_date_calculated`, override manual, versioning (`is_latest`), audit log, llamada async/sync a OCR (research.md §4) en [backend/src/repse/documents/service.py](backend/src/repse/documents/service.py).
-- [ ] T072 [US1] Endpoint `POST /api/v1/suppliers/{id}/documents` (multipart/form-data) en [backend/src/repse/documents/routes.py](backend/src/repse/documents/routes.py).
-- [ ] T073 [US1] Endpoint `GET /api/v1/documents` con filtros y paginación en [backend/src/repse/documents/routes.py](backend/src/repse/documents/routes.py).
-- [ ] T074 [US1] Endpoint `GET /api/v1/documents/{id}` con bloque `audit` poblado en [backend/src/repse/documents/routes.py](backend/src/repse/documents/routes.py).
-- [ ] T075 [US1] Endpoint `POST /api/v1/documents/{id}/download-token` emite JWS firmado (TTL 5 min) en [backend/src/repse/documents/routes.py](backend/src/repse/documents/routes.py).
-- [ ] T076 [US1] Endpoint `GET /api/v1/files/{token}` valida firma + sesión + tenant match, sirve `StreamingResponse` con `Content-Disposition` en [backend/src/repse/documents/routes.py](backend/src/repse/documents/routes.py).
+- [X] T071 [US1] Servicio `documents.upload`: orquesta validación de mime/tamaño, dedup por sha256, cálculo de `due_date_calculated`, override manual, versioning (`is_latest`), audit log, llamada async/sync a OCR (research.md §4) en [backend/src/repse/documents/service.py](backend/src/repse/documents/service.py).
+- [X] T072 [US1] Endpoint `POST /api/v1/suppliers/{id}/documents` (multipart/form-data) en [backend/src/repse/documents/routes.py](backend/src/repse/documents/routes.py).
+- [X] T073 [US1] Endpoint `GET /api/v1/documents` con filtros y paginación en [backend/src/repse/documents/routes.py](backend/src/repse/documents/routes.py).
+- [X] T074 [US1] Endpoint `GET /api/v1/documents/{id}` con bloque `audit` poblado en [backend/src/repse/documents/routes.py](backend/src/repse/documents/routes.py).
+- [X] T075 [US1] Endpoint `POST /api/v1/documents/{id}/download-token` emite JWS firmado (TTL 5 min) en [backend/src/repse/documents/routes.py](backend/src/repse/documents/routes.py).
+- [X] T076 [US1] Endpoint `GET /api/v1/files/{token}` valida firma + sesión + tenant match, sirve `StreamingResponse` con `Content-Disposition` en [backend/src/repse/documents/routes.py](backend/src/repse/documents/routes.py).
 
 ### Frontend US1
 
-- [ ] T077 [P] [US1] Página de login con botones "Continuar con Google" / "Continuar con Microsoft" en [frontend/src/pages/auth/login.tsx](frontend/src/pages/auth/login.tsx).
-- [ ] T078 [P] [US1] App shell con sidebar (Proveedores, Tablero placeholder, Configuración) y header con perfil en [frontend/src/app/layout.tsx](frontend/src/app/layout.tsx).
-- [ ] T079 [US1] Hook + queries Tanstack para `suppliers`, `supplier-types`, `document-types`, `documents` en [frontend/src/lib/api/index.ts](frontend/src/lib/api/index.ts).
-- [ ] T080 [P] [US1] Página listado de proveedores con búsqueda, filtros (estado, tipo de proveedor) y paginación en [frontend/src/pages/suppliers/list.tsx](frontend/src/pages/suppliers/list.tsx).
-- [ ] T081 [P] [US1] Formulario "Nuevo proveedor" con selector de `SupplierType` (incluye "Sin clasificar") y validación zod en [frontend/src/pages/suppliers/new.tsx](frontend/src/pages/suppliers/new.tsx).
-- [ ] T082 [P] [US1] Página detalle del proveedor con resumen + tabla `documents_by_type` (requeridos según tipo) en [frontend/src/pages/suppliers/detail.tsx](frontend/src/pages/suppliers/detail.tsx).
-- [ ] T083 [P] [US1] Modal "Subir documento": selector de tipo, periodo cubierto, override opcional de vencimiento, drag-drop, render de OCR best-effort prellenado, en [frontend/src/components/documents/UploadDialog.tsx](frontend/src/components/documents/UploadDialog.tsx).
-- [ ] T084 [P] [US1] Componente `<AuditBlock>` que muestra "Agregado por / Última actualización / Validado" (FR-011c, FR-011d) en [frontend/src/components/documents/AuditBlock.tsx](frontend/src/components/documents/AuditBlock.tsx).
-- [ ] T085 [P] [US1] Componente `<DocumentRow>` con tooltip de auditoría on-hover (FR-011c) en [frontend/src/components/documents/DocumentRow.tsx](frontend/src/components/documents/DocumentRow.tsx).
-- [ ] T086 [P] [US1] E2E Playwright smoke US1 (login mock OIDC → crear proveedor → subir PDF → ver en lista con audit block) en [frontend/tests/e2e/us1_upload_flow.spec.ts](frontend/tests/e2e/us1_upload_flow.spec.ts).
+- [X] T077 [P] [US1] Página de login con botones "Continuar con Google" / "Continuar con Microsoft" en [frontend/src/pages/auth/login.tsx](frontend/src/pages/auth/login.tsx).
+- [X] T078 [P] [US1] App shell con sidebar (Proveedores, Tablero placeholder, Configuración) y header con perfil en [frontend/src/app/layout.tsx](frontend/src/app/layout.tsx).
+- [X] T079 [US1] Hook + queries Tanstack para `suppliers`, `supplier-types`, `document-types`, `documents` en [frontend/src/lib/api/index.ts](frontend/src/lib/api/index.ts).
+- [X] T080 [P] [US1] Página listado de proveedores con búsqueda, filtros (estado, tipo de proveedor) y paginación en [frontend/src/pages/suppliers/list.tsx](frontend/src/pages/suppliers/list.tsx).
+- [X] T081 [P] [US1] Formulario "Nuevo proveedor" con selector de `SupplierType` (incluye "Sin clasificar") y validación zod en [frontend/src/pages/suppliers/new.tsx](frontend/src/pages/suppliers/new.tsx).
+- [X] T082 [P] [US1] Página detalle del proveedor con resumen + tabla `documents_by_type` (requeridos según tipo) en [frontend/src/pages/suppliers/detail.tsx](frontend/src/pages/suppliers/detail.tsx).
+- [X] T083 [P] [US1] Modal "Subir documento": selector de tipo, periodo cubierto, override opcional de vencimiento, drag-drop, render de OCR best-effort prellenado, en [frontend/src/components/documents/UploadDialog.tsx](frontend/src/components/documents/UploadDialog.tsx).
+- [X] T084 [P] [US1] Componente `<AuditBlock>` que muestra "Agregado por / Última actualización / Validado" (FR-011c, FR-011d) en [frontend/src/components/documents/AuditBlock.tsx](frontend/src/components/documents/AuditBlock.tsx).
+- [X] T085 [P] [US1] Componente `<DocumentRow>` con tooltip de auditoría on-hover (FR-011c) en [frontend/src/components/documents/DocumentRow.tsx](frontend/src/components/documents/DocumentRow.tsx).
+- [X] T086 [P] [US1] E2E Playwright smoke US1 (login mock OIDC → crear proveedor → subir PDF → ver en lista con audit block) en [frontend/tests/e2e/us1_upload_flow.spec.ts](frontend/tests/e2e/us1_upload_flow.spec.ts).
 
 **Checkpoint**: US1 funcional. Un usuario puede registrarse vía Google/Microsoft, crear un proveedor, subir un PDF y verlo en el detalle con su audit trail "Agregado por".
 
