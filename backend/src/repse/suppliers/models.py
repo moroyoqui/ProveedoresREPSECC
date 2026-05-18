@@ -36,7 +36,7 @@ class Supplier(Base, TimestampMixin, TenantOwned):
     contact_email: Mapped[str | None] = mapped_column(String(255))
     contact_phone: Mapped[str | None] = mapped_column(String(32))
     status: Mapped[SupplierStatus] = mapped_column(
-        Enum(SupplierStatus, native_enum=False, length=16),
+        Enum(SupplierStatus, native_enum=False, length=16, values_callable=lambda e: [m.value for m in e]),
         nullable=False,
         default=SupplierStatus.ACTIVE,
         server_default=SupplierStatus.ACTIVE.value,

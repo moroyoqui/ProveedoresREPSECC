@@ -1,6 +1,9 @@
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 
 import { AppShell } from "@/components/layout/AppShell";
+import { ApiError } from "@/lib/api";
+import { authApi } from "@/lib/api/index";
 import { useAuth } from "@/lib/auth";
 import { LoginPage } from "@/pages/auth/login";
 import { SupplierDetailPage } from "@/pages/suppliers/detail";
@@ -27,10 +30,44 @@ export function AppRouter() {
 }
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
-  // Auth state is hydrated by AppShell via /auth/me on mount; if /me returns
-  // 401, the apiFetch wrapper throws and the page surfaces. For v1 simplicity,
-  // we don't pre-block here.
-  useAuth();
+  const { user, setUser } = useAuth();
+  const location = useLocation();
+  const { isLoading, isError, error } = useQuery({
+    queryKey: ["me"],
+    queryFn: async () => {
+      const me = await authApi.me();
+      setUser({
+        id: me.id,
+        email: me.email,
+        displayName: me.display_name,
+        role: me.role,
+        organization: {
+          id: me.organization.id,
+          legalName: me.organization.legal_name,
+          rfc: me.organization.rfc,
+          timezone: me.organization.timezone,
+          expiringSoonThresholdDays: me.organization.expiring_soon_threshold_days,
+        },
+      });
+      return me;
+    },
+    retry: false,
+    staleTime: 60_000,
+    enabled: !user,
+  });
+
+  if (isLoading && !user) {
+    return (
+      <main className="flex min-h-full items-center justify-center text-sm text-neutral-500">
+        Cargando…
+      </main>
+    );
+  }
+
+  if (isError && error instanceof ApiError && error.status === 401) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
   return <>{children}</>;
 }
 

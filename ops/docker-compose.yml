@@ -15,8 +15,10 @@ services:
       - --default-authentication-plugin=caching_sha2_password
     volumes:
       - mysql_data:/var/lib/mysql
-    ports:
-      - "3306:3306"
+    # Host port intentionally NOT published; the app reaches mysql via the
+    # internal compose network. Uncomment if you need a local SQL client:
+    # ports:
+    #   - "3306:3306"
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD}"]
       interval: 10s
@@ -80,8 +82,8 @@ services:
     image: caddy:2-alpine
     restart: unless-stopped
     ports:
-      - "80:80"
-      - "443:443"
+      - "8080:80"
+      - "8443:443"
     environment:
       CADDY_DOMAIN: ${CADDY_DOMAIN}
     volumes:

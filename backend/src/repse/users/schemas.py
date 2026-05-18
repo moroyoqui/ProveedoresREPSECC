@@ -24,9 +24,11 @@ class UserCreate(BaseModel):
     email: EmailStr
     display_name: str = Field(..., min_length=1, max_length=255)
     role: Role
+    password: str | None = Field(None, min_length=8, max_length=128)
 
 
 class UserPatch(BaseModel):
     display_name: str | None = Field(None, min_length=1, max_length=255)
     role: Role | None = None
     status: UserStatus | None = None
+    password: str | None = Field(None, min_length=8, max_length=128)

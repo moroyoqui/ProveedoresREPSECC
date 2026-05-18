@@ -62,7 +62,7 @@ def upload_document(
     return _serialize(db, doc)
 
 
-@router.get("")
+@router.get("/documents")
 def list_documents(
     supplier_id: int | None = None,
     document_type_id: int | None = None,
@@ -88,7 +88,7 @@ def list_documents(
     }
 
 
-@router.get("/{document_id}")
+@router.get("/documents/{document_id}")
 def get_document(
     document_id: int,
     user: CurrentUser = Depends(current_user),
@@ -103,7 +103,7 @@ def get_document(
 # ---------- Download tokens + serving ----------
 
 
-@router.post("/{document_id}/download-token")
+@router.post("/documents/{document_id}/download-token")
 def issue_download_token(
     document_id: int,
     user: CurrentUser = Depends(current_user),
@@ -157,7 +157,7 @@ def download_file(
 # ---------- Verify / unverify ----------
 
 
-@router.post("/{document_id}/verify")
+@router.post("/documents/{document_id}/verify")
 def verify_document_route(
     document_id: int,
     body: dict,
@@ -174,7 +174,7 @@ def verify_document_route(
     return _serialize(db, doc)
 
 
-@router.post("/{document_id}/unverify")
+@router.post("/documents/{document_id}/unverify")
 def unverify_document_route(
     document_id: int,
     user: CurrentUser = Depends(require_role(Role.ADMIN.value)),

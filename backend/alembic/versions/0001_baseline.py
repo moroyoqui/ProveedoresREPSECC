@@ -19,6 +19,10 @@ from collections.abc import Sequence
 
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.dialects import mysql
+
+# Use MySQL DATETIME(6) so columns accept CURRENT_TIMESTAMP(6) as default.
+DT6 = mysql.DATETIME(fsp=6)
 
 revision: str = "0001_baseline"
 down_revision: str | None = None
@@ -37,9 +41,9 @@ def upgrade() -> None:
         sa.Column("timezone", sa.String(length=64), nullable=False, server_default="America/Mexico_City"),
         sa.Column("status", sa.String(length=16), nullable=False, server_default="active"),
         sa.Column("grace_until", sa.Date()),
-        sa.Column("created_at", sa.DateTime(), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP(6)")),
-        sa.Column("updated_at", sa.DateTime(), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP(6)")),
-        sa.Column("deleted_at", sa.DateTime()),
+        sa.Column("created_at", DT6, nullable=False, server_default=sa.text("CURRENT_TIMESTAMP(6)")),
+        sa.Column("updated_at", DT6, nullable=False, server_default=sa.text("CURRENT_TIMESTAMP(6)")),
+        sa.Column("deleted_at", DT6),
         sa.UniqueConstraint("rfc", name="uq_organizations_rfc"),
     )
 
@@ -53,9 +57,9 @@ def upgrade() -> None:
         sa.Column("display_name", sa.String(length=255), nullable=False),
         sa.Column("role", sa.String(length=16), nullable=False),
         sa.Column("status", sa.String(length=16), nullable=False, server_default="active"),
-        sa.Column("last_login_at", sa.DateTime()),
-        sa.Column("created_at", sa.DateTime(), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP(6)")),
-        sa.Column("updated_at", sa.DateTime(), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP(6)")),
+        sa.Column("last_login_at", DT6),
+        sa.Column("created_at", DT6, nullable=False, server_default=sa.text("CURRENT_TIMESTAMP(6)")),
+        sa.Column("updated_at", DT6, nullable=False, server_default=sa.text("CURRENT_TIMESTAMP(6)")),
         sa.ForeignKeyConstraint(["organization_id"], ["organizations.id"], name="fk_users_organization_id_organizations", ondelete="RESTRICT"),
         sa.UniqueConstraint("organization_id", "email", name="uq_users_email"),
         sa.UniqueConstraint("oidc_provider", "oidc_subject", name="uq_users_oidc"),
@@ -72,8 +76,8 @@ def upgrade() -> None:
         sa.Column("origin", sa.String(length=16), nullable=False, server_default="canonical"),
         sa.Column("organization_id", sa.BigInteger()),
         sa.Column("status", sa.String(length=16), nullable=False, server_default="active"),
-        sa.Column("created_at", sa.DateTime(), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP(6)")),
-        sa.Column("updated_at", sa.DateTime(), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP(6)")),
+        sa.Column("created_at", DT6, nullable=False, server_default=sa.text("CURRENT_TIMESTAMP(6)")),
+        sa.Column("updated_at", DT6, nullable=False, server_default=sa.text("CURRENT_TIMESTAMP(6)")),
         sa.ForeignKeyConstraint(["organization_id"], ["organizations.id"], name="fk_document_types_organization_id_organizations", ondelete="CASCADE"),
         sa.UniqueConstraint("slug", name="uq_document_types_slug"),
         sa.UniqueConstraint("organization_id", "name", name="uq_document_types_org_name"),
@@ -87,7 +91,7 @@ def upgrade() -> None:
         sa.Column("document_type_id", sa.BigInteger(), nullable=False),
         sa.Column("active", sa.Boolean(), nullable=False),
         sa.Column("last_changed_by", sa.BigInteger()),
-        sa.Column("last_changed_at", sa.DateTime()),
+        sa.Column("last_changed_at", DT6),
         sa.ForeignKeyConstraint(["organization_id"], ["organizations.id"], name="fk_tdts_organization_id_organizations", ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["document_type_id"], ["document_types.id"], name="fk_tdts_document_type_id_document_types", ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["last_changed_by"], ["users.id"], name="fk_tdts_last_changed_by_users", ondelete="SET NULL"),
@@ -103,8 +107,8 @@ def upgrade() -> None:
         sa.Column("description", sa.Text()),
         sa.Column("origin", sa.String(length=16), nullable=False, server_default="custom"),
         sa.Column("status", sa.String(length=16), nullable=False, server_default="active"),
-        sa.Column("created_at", sa.DateTime(), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP(6)")),
-        sa.Column("updated_at", sa.DateTime(), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP(6)")),
+        sa.Column("created_at", DT6, nullable=False, server_default=sa.text("CURRENT_TIMESTAMP(6)")),
+        sa.Column("updated_at", DT6, nullable=False, server_default=sa.text("CURRENT_TIMESTAMP(6)")),
         sa.ForeignKeyConstraint(["organization_id"], ["organizations.id"], name="fk_supplier_types_organization_id_organizations", ondelete="RESTRICT"),
         sa.UniqueConstraint("organization_id", "name", name="uq_supplier_types_org_name"),
     )
@@ -119,8 +123,8 @@ def upgrade() -> None:
         sa.Column("periodicity_override", sa.String(length=16)),
         sa.Column("status", sa.String(length=16), nullable=False, server_default="active"),
         sa.Column("created_by", sa.BigInteger()),
-        sa.Column("created_at", sa.DateTime(), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP(6)")),
-        sa.Column("updated_at", sa.DateTime(), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP(6)")),
+        sa.Column("created_at", DT6, nullable=False, server_default=sa.text("CURRENT_TIMESTAMP(6)")),
+        sa.Column("updated_at", DT6, nullable=False, server_default=sa.text("CURRENT_TIMESTAMP(6)")),
         sa.ForeignKeyConstraint(["organization_id"], ["organizations.id"], name="fk_stdr_organization_id_organizations", ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(["supplier_type_id"], ["supplier_types.id"], name="fk_stdr_supplier_type_id_supplier_types", ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["document_type_id"], ["document_types.id"], name="fk_stdr_document_type_id_document_types", ondelete="RESTRICT"),
@@ -143,9 +147,9 @@ def upgrade() -> None:
         sa.Column("contact_phone", sa.String(length=32)),
         sa.Column("status", sa.String(length=16), nullable=False, server_default="active"),
         sa.Column("notes", sa.Text()),
-        sa.Column("created_at", sa.DateTime(), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP(6)")),
-        sa.Column("updated_at", sa.DateTime(), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP(6)")),
-        sa.Column("deleted_at", sa.DateTime()),
+        sa.Column("created_at", DT6, nullable=False, server_default=sa.text("CURRENT_TIMESTAMP(6)")),
+        sa.Column("updated_at", DT6, nullable=False, server_default=sa.text("CURRENT_TIMESTAMP(6)")),
+        sa.Column("deleted_at", DT6),
         sa.ForeignKeyConstraint(["organization_id"], ["organizations.id"], name="fk_suppliers_organization_id_organizations", ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(["supplier_type_id"], ["supplier_types.id"], name="fk_suppliers_supplier_type_id_supplier_types", ondelete="RESTRICT"),
         sa.UniqueConstraint("organization_id", "rfc", name="uq_suppliers_org_rfc"),
@@ -168,12 +172,12 @@ def upgrade() -> None:
         sa.Column("status", sa.String(length=20), nullable=False),
         sa.Column("verified", sa.Boolean(), nullable=False, server_default="0"),
         sa.Column("verified_by", sa.BigInteger()),
-        sa.Column("verified_at", sa.DateTime()),
+        sa.Column("verified_at", DT6),
         sa.Column("verified_note", sa.String(length=500)),
         sa.Column("version", sa.SmallInteger(), nullable=False, server_default="1"),
         sa.Column("is_latest", sa.Boolean(), nullable=False, server_default="1"),
         sa.Column("last_updated_by", sa.BigInteger()),
-        sa.Column("last_updated_at", sa.DateTime()),
+        sa.Column("last_updated_at", DT6),
         sa.Column("file_path", sa.String(length=1024), nullable=False),
         sa.Column("file_name_original", sa.String(length=255), nullable=False),
         sa.Column("file_size_bytes", sa.BigInteger(), nullable=False),
@@ -185,9 +189,9 @@ def upgrade() -> None:
         sa.Column("ocr_extracted_valid_until", sa.Date()),
         sa.Column("ocr_raw_text", sa.Text()),
         sa.Column("uploaded_by", sa.BigInteger(), nullable=False),
-        sa.Column("created_at", sa.DateTime(), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP(6)")),
-        sa.Column("updated_at", sa.DateTime(), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP(6)")),
-        sa.Column("deleted_at", sa.DateTime()),
+        sa.Column("created_at", DT6, nullable=False, server_default=sa.text("CURRENT_TIMESTAMP(6)")),
+        sa.Column("updated_at", DT6, nullable=False, server_default=sa.text("CURRENT_TIMESTAMP(6)")),
+        sa.Column("deleted_at", DT6),
         sa.ForeignKeyConstraint(["organization_id"], ["organizations.id"], name="fk_documents_organization_id_organizations", ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(["supplier_id"], ["suppliers.id"], name="fk_documents_supplier_id_suppliers", ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["document_type_id"], ["document_types.id"], name="fk_documents_document_type_id_document_types", ondelete="RESTRICT"),
@@ -215,7 +219,7 @@ def upgrade() -> None:
         sa.Column("entity_type", sa.String(length=64), nullable=False),
         sa.Column("entity_id", sa.BigInteger()),
         sa.Column("metadata", sa.JSON(), nullable=False),
-        sa.Column("created_at", sa.DateTime(), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP(6)")),
+        sa.Column("created_at", DT6, nullable=False, server_default=sa.text("CURRENT_TIMESTAMP(6)")),
         sa.ForeignKeyConstraint(["organization_id"], ["organizations.id"], name="fk_audit_log_organization_id_organizations", ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(["actor_user_id"], ["users.id"], name="fk_audit_log_actor_user_id_users", ondelete="SET NULL"),
     )

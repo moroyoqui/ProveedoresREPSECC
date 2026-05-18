@@ -70,7 +70,7 @@ class Document(Base, TimestampMixin, TenantOwned):
     due_date_effective: Mapped[date | None] = mapped_column(Date)
     due_date_override_reason: Mapped[str | None] = mapped_column(String(255))
     status: Mapped[DocumentStatus] = mapped_column(
-        Enum(DocumentStatus, native_enum=False, length=20), nullable=False
+        Enum(DocumentStatus, native_enum=False, length=20, values_callable=lambda e: [m.value for m in e]), nullable=False
     )
 
     # Manual validation (FR-012a spec 001).
@@ -100,7 +100,7 @@ class Document(Base, TimestampMixin, TenantOwned):
 
     # OCR best-effort (FR-008a spec 001).
     ocr_status: Mapped[OcrStatus] = mapped_column(
-        Enum(OcrStatus, native_enum=False, length=16),
+        Enum(OcrStatus, native_enum=False, length=16, values_callable=lambda e: [m.value for m in e]),
         nullable=False,
         default=OcrStatus.NOT_RUN,
         server_default=OcrStatus.NOT_RUN.value,

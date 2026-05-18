@@ -48,13 +48,13 @@ class SupplierType(Base, TimestampMixin, TenantOwned):
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
     origin: Mapped[SupplierTypeOrigin] = mapped_column(
-        Enum(SupplierTypeOrigin, native_enum=False, length=16),
+        Enum(SupplierTypeOrigin, native_enum=False, length=16, values_callable=lambda e: [m.value for m in e]),
         nullable=False,
         default=SupplierTypeOrigin.CUSTOM,
         server_default=SupplierTypeOrigin.CUSTOM.value,
     )
     status: Mapped[SupplierTypeStatus] = mapped_column(
-        Enum(SupplierTypeStatus, native_enum=False, length=16),
+        Enum(SupplierTypeStatus, native_enum=False, length=16, values_callable=lambda e: [m.value for m in e]),
         nullable=False,
         default=SupplierTypeStatus.ACTIVE,
         server_default=SupplierTypeStatus.ACTIVE.value,
@@ -81,10 +81,10 @@ class SupplierTypeDocumentRequirement(Base, TimestampMixin, TenantOwned):
         BigInteger, ForeignKey("document_types.id", ondelete="RESTRICT"), nullable=False, index=True
     )
     periodicity_override: Mapped[Periodicity | None] = mapped_column(
-        Enum(Periodicity, native_enum=False, length=16), nullable=True
+        Enum(Periodicity, native_enum=False, length=16, values_callable=lambda e: [m.value for m in e]), nullable=True
     )
     status: Mapped[RequirementStatus] = mapped_column(
-        Enum(RequirementStatus, native_enum=False, length=16),
+        Enum(RequirementStatus, native_enum=False, length=16, values_callable=lambda e: [m.value for m in e]),
         nullable=False,
         default=RequirementStatus.ACTIVE,
         server_default=RequirementStatus.ACTIVE.value,

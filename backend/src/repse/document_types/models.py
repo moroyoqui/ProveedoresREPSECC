@@ -47,10 +47,10 @@ class DocumentType(Base, TimestampMixin):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
     periodicity: Mapped[Periodicity] = mapped_column(
-        Enum(Periodicity, native_enum=False, length=16), nullable=False
+        Enum(Periodicity, native_enum=False, length=16, values_callable=lambda e: [m.value for m in e]), nullable=False
     )
     origin: Mapped[DocumentTypeOrigin] = mapped_column(
-        Enum(DocumentTypeOrigin, native_enum=False, length=16),
+        Enum(DocumentTypeOrigin, native_enum=False, length=16, values_callable=lambda e: [m.value for m in e]),
         nullable=False,
         default=DocumentTypeOrigin.CANONICAL,
         server_default=DocumentTypeOrigin.CANONICAL.value,
@@ -60,7 +60,7 @@ class DocumentType(Base, TimestampMixin):
         BigInteger, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=True, index=True
     )
     status: Mapped[DocumentTypeStatus] = mapped_column(
-        Enum(DocumentTypeStatus, native_enum=False, length=16),
+        Enum(DocumentTypeStatus, native_enum=False, length=16, values_callable=lambda e: [m.value for m in e]),
         nullable=False,
         default=DocumentTypeStatus.ACTIVE,
         server_default=DocumentTypeStatus.ACTIVE.value,

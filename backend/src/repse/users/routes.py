@@ -7,6 +7,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from repse.auth.dependencies import CurrentUser, current_user, require_role
+from repse.auth.passwords import hash_password
 from repse.db.session import get_db
 from repse.errors import Conflict, NotFound
 from repse.users.models import Role, User, UserStatus
@@ -43,6 +44,7 @@ def create_user(
         display_name=body.display_name,
         role=body.role,
         status=UserStatus.ACTIVE,
+        password_hash=hash_password(body.password) if body.password else None,
     )
     db.add(new)
     db.commit()
@@ -71,6 +73,8 @@ def update_user(
         if body.status is UserStatus.DISABLED and row.role is Role.ADMIN:
             _guard_last_admin(db, actor.organization_id, exclude_user_id=row.id)
         row.status = body.status
+    if body.password is not None:
+        row.password_hash = hash_password(body.password)
     db.commit()
     db.refresh(row)
     return row

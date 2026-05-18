@@ -16,7 +16,7 @@
         -Server
     }
 
-    @api path /api/* /docs /openapi.json /metrics
+    @api path /api/* /docs /openapi.json /metrics /health
     reverse_proxy @api app:8000
 
     reverse_proxy frontend:5173

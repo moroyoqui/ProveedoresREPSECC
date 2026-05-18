@@ -14,12 +14,14 @@ from urllib.parse import urlencode
 from authlib.integrations.starlette_client import OAuth, OAuthError
 from fastapi import APIRouter, Depends, Query, Request, Response
 from fastapi.responses import RedirectResponse
+from pydantic import BaseModel, EmailStr
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware  # noqa: F401  (caller wires it)
 
 from repse.auth.dependencies import CurrentUser, current_user
 from repse.auth.oidc import build_oauth
+from repse.auth.passwords import verify_password
 from repse.auth.session import COOKIE_NAME, SessionManager, SessionPayload, fresh_expiry
 from repse.config import Settings, get_settings
 from repse.db.session import get_db
@@ -151,6 +153,61 @@ def _bootstrap_organization(db: Session, *, contact_email: str) -> Organization:
     db.add(org)
     db.flush()
     return org
+
+
+class LoginIn(BaseModel):
+    email: EmailStr
+    password: str
+
+
+@router.post("/login")
+def login_local(
+    body: LoginIn,
+    response: Response,
+    sessions: SessionManager = Depends(_session_mgr),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Email + password login against the local users table (FR-002 spec 001).
+
+    Returns the same session cookie as the OIDC callback. Multi-tenant lookup:
+    the (organization_id, email) combo is unique, but a given email may exist
+    only in ONE organization per current model — fail closed if multiple
+    matches.
+    """
+    email = body.email.lower().strip()
+    with with_admin_scope():
+        candidates = db.execute(
+            select(User).where(User.email == email, User.status == UserStatus.ACTIVE)
+        ).scalars().all()
+    if len(candidates) == 0:
+        raise ValidationFailure(
+            "Invalid email or password", details={"code": "invalid_credentials"}
+        )
+    if len(candidates) > 1:
+        # Should not happen with current schema (a user belongs to one org) but
+        # be defensive: refuse to guess.
+        raise Conflict(
+            "Email is registered in more than one tenant; contact your admin.",
+            details={"code": "ambiguous_user"},
+        )
+    user = candidates[0]
+    if not verify_password(body.password, user.password_hash):
+        raise ValidationFailure(
+            "Invalid email or password", details={"code": "invalid_credentials"}
+        )
+
+    with with_admin_scope():
+        user.last_login_at = datetime.now(timezone.utc)
+        db.commit()
+
+    payload = SessionPayload(
+        user_id=user.id,
+        organization_id=user.organization_id,
+        role=user.role.value,
+        expires_at=fresh_expiry(),
+    )
+    sessions.issue(response, payload)
+    return {"status": "ok", "user_id": user.id, "organization_id": user.organization_id}
 
 
 @router.post("/logout", status_code=204)

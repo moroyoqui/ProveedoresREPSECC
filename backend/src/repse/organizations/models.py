@@ -32,7 +32,7 @@ class Organization(Base, TimestampMixin):
         String(64), nullable=False, default="America/Mexico_City", server_default="America/Mexico_City"
     )
     status: Mapped[OrgStatus] = mapped_column(
-        Enum(OrgStatus, native_enum=False, length=16),
+        Enum(OrgStatus, native_enum=False, length=16, values_callable=lambda e: [m.value for m in e]),
         nullable=False,
         default=OrgStatus.ACTIVE,
         server_default=OrgStatus.ACTIVE.value,

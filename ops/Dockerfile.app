@@ -18,10 +18,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-COPY backend/pyproject.toml /app/pyproject.toml
-RUN pip install --upgrade pip && pip install -e ".[dev]"
-
+# Copy source first so pip install -e finds the package layout. The pyproject
+# declares src/repse as the package; the editable install creates a .pth that
+# points back into /app/src.
 COPY backend /app
+RUN pip install --upgrade pip && pip install -e ".[dev]"
 
 RUN useradd --create-home --uid 1000 app && chown -R app:app /app
 USER app
