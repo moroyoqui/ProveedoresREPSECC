@@ -4,14 +4,15 @@ import { useState } from "react";
 import { Pencil, Upload } from "lucide-react";
 
 import { suppliersApi } from "@/lib/api/index";
-import { Button, Card, CardBody, CardHeader, CardTitle, Table, TBody, TD, TH, THead, TR } from "@/components/ui";
-import { StatusBadge } from "@/components/documents/StatusBadge";
+import { Button, Card, CardBody, CardHeader, CardTitle } from "@/components/ui";
 import { UploadDialog } from "@/components/documents/UploadDialog";
+import { ComplianceGrid } from "@/components/suppliers/ComplianceGrid";
 
 export function SupplierDetailPage() {
   const { id } = useParams<{ id: string }>();
   const supplierId = Number(id);
   const [showUpload, setShowUpload] = useState(false);
+  const year = new Date().getFullYear();
 
   const { data, isLoading } = useQuery({
     queryKey: ["supplier", supplierId],
@@ -19,11 +20,17 @@ export function SupplierDetailPage() {
     enabled: !Number.isNaN(supplierId),
   });
 
+  const compliance = useQuery({
+    queryKey: ["supplier-compliance", supplierId, year],
+    queryFn: () => suppliersApi.compliance(supplierId, year),
+    enabled: !Number.isNaN(supplierId),
+  });
+
   if (isLoading) return <p className="p-8 text-sm text-neutral-500">Cargando…</p>;
   if (!data) return <p className="p-8 text-sm text-status-expired">No encontrado</p>;
 
   return (
-    <div className="mx-auto max-w-5xl p-8">
+    <div className="mx-auto max-w-6xl p-8">
       <Link to="/suppliers" className="text-sm text-brand-500 hover:underline">
         ← Volver a proveedores
       </Link>
@@ -71,35 +78,20 @@ export function SupplierDetailPage() {
         </CardBody>
       </Card>
 
-      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-neutral-500">
-        Documentos requeridos
-      </h2>
-      <Table>
-        <THead>
-          <TR>
-            <TH>Tipo</TH>
-            <TH>Periodo</TH>
-            <TH>Vencimiento</TH>
-            <TH>Estado</TH>
-            <TH>Verificado</TH>
-          </TR>
-        </THead>
-        <TBody>
-          {data.documents_by_type.map((row) => (
-            <TR key={row.document_type.id}>
-              <TD>{row.document_type.name}</TD>
-              <TD className="text-neutral-600">
-                {row.latest?.coverage_period_start ?? "—"}
-              </TD>
-              <TD>{row.latest?.due_date_effective ?? "—"}</TD>
-              <TD>
-                <StatusBadge status={row.latest?.status || row.status_override || "missing"} />
-              </TD>
-              <TD>{row.latest?.verified ? "✓" : "—"}</TD>
-            </TR>
-          ))}
-        </TBody>
-      </Table>
+      <section className="mb-6">
+        <div className="mb-3 flex items-baseline justify-between">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
+            Cumplimiento {year}
+          </h2>
+        </div>
+        {compliance.isLoading ? (
+          <p className="text-sm text-neutral-500">Cargando cuadrícula…</p>
+        ) : compliance.data ? (
+          <ComplianceGrid data={compliance.data} />
+        ) : (
+          <p className="text-sm text-status-expired">No se pudo cargar la cuadrícula.</p>
+        )}
+      </section>
 
       {showUpload && (
         <UploadDialog supplierId={supplierId} onClose={() => setShowUpload(false)} />

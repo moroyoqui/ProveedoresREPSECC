@@ -226,6 +226,58 @@ export type SupplierCreate = {
   notes?: string;
 };
 
+export type CellStatus =
+  | "validated"
+  | "submitted"
+  | "expired"
+  | "missing"
+  | "pending"
+  | "future"
+  | "not_required";
+
+export type ComplianceCell = {
+  month: number;
+  status: CellStatus;
+  document_id: number | null;
+  coverage_period_start: string | null;
+};
+
+export type MonthlyRequirement = {
+  document_type: {
+    id: number;
+    slug: string;
+    name: string;
+    periodicity: Periodicity;
+  };
+  cells: ComplianceCell[];
+};
+
+export type OneTimeRequirement = {
+  document_type: {
+    id: number;
+    slug: string;
+    name: string;
+    periodicity: Periodicity;
+  };
+  status: CellStatus;
+  document_id: number | null;
+  due_date_effective: string | null;
+};
+
+export type ComplianceGrid = {
+  supplier: {
+    id: number;
+    legal_name: string;
+    rfc: string;
+    supplier_type: { id: number; name: string };
+    status: SupplierStatus;
+    compliance_percent: number;
+  };
+  year: number;
+  monthly_requirements: MonthlyRequirement[];
+  one_time_requirements: OneTimeRequirement[];
+};
+
 export const suppliersApi = {
   list: (params: { q?: string; status?: string; supplier_type_id?: number } = {}) => {
     const qs = new URLSearchParams();
@@ -240,6 +292,8 @@ export const suppliersApi = {
   detail: (id: number) => apiFetch<SupplierDetail>(`/suppliers/${id}`),
   create: (body: SupplierCreate) =>
     apiFetch<SupplierListItem>("/suppliers", { method: "POST", json: body }),
+  compliance: (supplierId: number, year: number) =>
+    apiFetch<ComplianceGrid>(`/suppliers/${supplierId}/compliance?year=${year}`),
 };
 
 // ---------- Documents ----------

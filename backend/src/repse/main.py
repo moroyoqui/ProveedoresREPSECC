@@ -20,6 +20,7 @@ from repse.observability.sentry import init_sentry
 
 # Domain routers (Phase 3).
 from repse.auth.routes import router as auth_router
+from repse.compliance.routes import router as compliance_router
 from repse.documents.routes import router as documents_router
 from repse.document_types.routes import router as document_types_router
 from repse.organizations.routes import router as organizations_router
@@ -96,5 +97,6 @@ app.include_router(supplier_type_requirements_router, prefix=f"{API_PREFIX}/supp
 app.include_router(document_types_router, prefix=f"{API_PREFIX}/document-types", tags=["document-types"])
 app.include_router(suppliers_router, prefix=f"{API_PREFIX}/suppliers", tags=["suppliers"])
 app.include_router(documents_router, prefix=f"{API_PREFIX}", tags=["documents"])
+app.include_router(compliance_router, prefix=f"{API_PREFIX}", tags=["compliance"])
 
 __all__ = ["app"]

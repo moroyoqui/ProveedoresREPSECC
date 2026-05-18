@@ -19,7 +19,7 @@
 
 **Purpose**: Crear la estructura del módulo `compliance/` en el backend.
 
-- [ ] T001 Crear `backend/src/repse/compliance/__init__.py` (archivo vacío — registra el módulo Python)
+- [X] T001 Crear `backend/src/repse/compliance/__init__.py` (archivo vacío — registra el módulo Python)
 
 ---
 
@@ -29,8 +29,8 @@
 
 **⚠️ CRITICAL**: Ninguna historia puede empezar hasta completar esta fase.
 
-- [ ] T002 Definir schemas Pydantic en `backend/src/repse/compliance/schemas.py`: enum `CellStatus` con literales `validated | submitted | expired | missing | pending | future | not_required`; dataclasses `CellOut`, `MonthlyRequirementOut`, `OneTimeRequirementOut`, `SupplierSummaryOut`, `ComplianceGridOut`; shapes exactos según [contracts/compliance.md](./contracts/compliance.md)
-- [ ] T003 [P] Agregar función `suppliersApi.compliance(supplierId: number, year: number)` a `frontend/src/lib/api/index.ts` con el tipo de respuesta TypeScript correspondiente a `ComplianceGridOut`
+- [X] T002 Definir schemas Pydantic en `backend/src/repse/compliance/schemas.py`: enum `CellStatus` con literales `validated | submitted | expired | missing | pending | future | not_required`; dataclasses `CellOut`, `MonthlyRequirementOut`, `OneTimeRequirementOut`, `SupplierSummaryOut`, `ComplianceGridOut`; shapes exactos según [contracts/compliance.md](./contracts/compliance.md)
+- [X] T003 [P] Agregar función `suppliersApi.compliance(supplierId: number, year: number)` a `frontend/src/lib/api/index.ts` con el tipo de respuesta TypeScript correspondiente a `ComplianceGridOut`
 
 **Checkpoint**: Schemas listos — las fases de historias de usuario pueden comenzar.
 
@@ -44,15 +44,15 @@
 
 ### Tests para US1 + US2 (obligatorios por constitución — Principio III)
 
-- [ ] T004 [US1] Escribir unit tests en `backend/tests/unit/test_compliance_service.py` cubriendo los 7 estados de `cell_status`: `validated` (doc verified), `submitted` (doc not verified), `expired` (doc status=expired), `missing` (mes pasado sin doc), `pending` (mes actual sin doc), `future` (mes futuro sin doc), `not_required` (mes no aplica para la periodicidad). Los tests deben **fallar** antes de que exista la implementación.
-- [ ] T005 [US1] Escribir integration test en `backend/tests/integration/test_compliance_routes.py`: caso happy path (GET compliance devuelve 200 con estructura correcta) y caso negativo multi-tenant (usuario de Org A solicita compliance de proveedor de Org B → 404). Tests deben **fallar** antes de la implementación.
+- [X] T004 [US1] Escribir unit tests en `backend/tests/unit/test_compliance_service.py` cubriendo los 7 estados de `cell_status`: `validated` (doc verified), `submitted` (doc not verified), `expired` (doc status=expired), `missing` (mes pasado sin doc), `pending` (mes actual sin doc), `future` (mes futuro sin doc), `not_required` (mes no aplica para la periodicidad). Los tests deben **fallar** antes de que exista la implementación.
+- [X] T005 [US1] Escribir integration test en `backend/tests/integration/test_compliance_routes.py`: caso happy path (GET compliance devuelve 200 con estructura correcta) y caso negativo multi-tenant (usuario de Org A solicita compliance de proveedor de Org B → 404). Tests deben **fallar** antes de la implementación.
 
 ### Implementación para US1 + US2
 
-- [ ] T006 [US1] Implementar `backend/src/repse/compliance/service.py` con: función `effective_periodicity(req, doc_type)` que resuelve `periodicity_override` o hereda del `DocumentType`; función `applicable_months(periodicity)` → lista de ints (ver [research.md §3](./research.md)); función `cell_status(doc, month, year, today)` → `CellStatus` con las 7 reglas del [data-model.md](./data-model.md); función asíncrona `get_annual_compliance(db, supplier_id, year, org_id)` → `ComplianceGridOut` usando las dos queries del data-model (requisitos activos + documentos del año).
-- [ ] T007 [P] [US1] Implementar `backend/src/repse/compliance/routes.py`: `GET /api/v1/suppliers/{supplier_id}/compliance` con query param `year` (default año actual, rango 2020–año actual); inyectar `current_user` y `current_tenant` como en el resto de rutas del proyecto; devolver 404 si el proveedor no pertenece al tenant.
-- [ ] T008 [US1] Registrar el compliance router en `backend/src/repse/main.py` bajo el prefijo `/api/v1`.
-- [ ] T009 [P] [US1] Crear componente `frontend/src/components/suppliers/ComplianceCell.tsx`: esfera SVG o `div` redondeado con el color correspondiente al `CellStatus`; Radix Tooltip con descripción textual del estado; celda vacía (sin esfera) para `not_required`.
+- [X] T006 [US1] Implementar `backend/src/repse/compliance/service.py` con: función `effective_periodicity(req, doc_type)` que resuelve `periodicity_override` o hereda del `DocumentType`; función `applicable_months(periodicity)` → lista de ints (ver [research.md §3](./research.md)); función `cell_status(doc, month, year, today)` → `CellStatus` con las 7 reglas del [data-model.md](./data-model.md); función asíncrona `get_annual_compliance(db, supplier_id, year, org_id)` → `ComplianceGridOut` usando las dos queries del data-model (requisitos activos + documentos del año).
+- [X] T007 [P] [US1] Implementar `backend/src/repse/compliance/routes.py`: `GET /api/v1/suppliers/{supplier_id}/compliance` con query param `year` (default año actual, rango 2020–año actual); inyectar `current_user` y `current_tenant` como en el resto de rutas del proyecto; devolver 404 si el proveedor no pertenece al tenant.
+- [X] T008 [US1] Registrar el compliance router en `backend/src/repse/main.py` bajo el prefijo `/api/v1`.
+- [X] T009 [P] [US1] Crear componente `frontend/src/components/suppliers/ComplianceCell.tsx`: esfera SVG o `div` redondeado con el color correspondiente al `CellStatus`; Radix Tooltip con descripción textual del estado; celda vacía (sin esfera) para `not_required`.
 
   Paleta de colores Tailwind:
   - `validated` → `bg-green-500`
@@ -63,8 +63,8 @@
   - `future` → `bg-gray-200`
   - `not_required` → sin esfera, celda vacía
 
-- [ ] T010 [US1] Crear componente `frontend/src/components/suppliers/ComplianceGrid.tsx`: CSS Grid con `grid-cols-[minmax(160px,1fr)_repeat(12,minmax(0,40px))]`; fila de encabezado con abreviaturas de mes (Ene–Dic) pegada al top (`sticky top-0 bg-white z-10`); mes actual con columna resaltada (fondo sutil `bg-brand-50`); una fila por cada item de `monthly_requirements`; cada celda renderiza `ComplianceCell`; una leyenda debajo del grid con los cuatro estados visibles (validated/submitted/missing/future).
-- [ ] T011 [US1] Modificar `frontend/src/pages/suppliers/detail.tsx`: agregar query `useQuery(['supplier-compliance', supplierId, year], () => suppliersApi.compliance(supplierId, year))`; reemplazar la sección "Documentos requeridos" (tabla plana) por el componente `ComplianceGrid`; mostrar spinner mientras carga; estado vacío si `monthly_requirements` está vacío.
+- [X] T010 [US1] Crear componente `frontend/src/components/suppliers/ComplianceGrid.tsx`: CSS Grid con `grid-cols-[minmax(160px,1fr)_repeat(12,minmax(0,40px))]`; fila de encabezado con abreviaturas de mes (Ene–Dic) pegada al top (`sticky top-0 bg-white z-10`); mes actual con columna resaltada (fondo sutil `bg-brand-50`); una fila por cada item de `monthly_requirements`; cada celda renderiza `ComplianceCell`; una leyenda debajo del grid con los cuatro estados visibles (validated/submitted/missing/future).
+- [X] T011 [US1] Modificar `frontend/src/pages/suppliers/detail.tsx`: agregar query `useQuery(['supplier-compliance', supplierId, year], () => suppliersApi.compliance(supplierId, year))`; reemplazar la sección "Documentos requeridos" (tabla plana) por el componente `ComplianceGrid`; mostrar spinner mientras carga; estado vacío si `monthly_requirements` está vacío.
 
 **Checkpoint**: Las US1 y US2 son completamente funcionales. La cuadrícula con colores es visible al entrar al detalle de un proveedor.
 
