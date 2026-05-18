@@ -1,0 +1,28 @@
+# Caddy reverse proxy + TLS automático.
+# En local: `tls internal` genera cert autofirmado confiable.
+# En prod: cambiar CADDY_DOMAIN a tu dominio público; Caddy obtiene cert ACME automáticamente.
+
+{$CADDY_DOMAIN} {
+    tls internal
+
+    encode gzip zstd
+
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Permissions-Policy "geolocation=(), microphone=(), camera=()"
+        -Server
+    }
+
+    @api path /api/* /docs /openapi.json /metrics
+    reverse_proxy @api app:8000
+
+    reverse_proxy frontend:5173
+
+    log {
+        output stdout
+        format json
+    }
+}
