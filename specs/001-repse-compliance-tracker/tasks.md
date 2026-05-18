@@ -28,16 +28,16 @@ Monorepo: `backend/` (FastAPI + SQLAlchemy + Alembic), `frontend/` (Vite + React
 
 **Purpose**: scaffolding inicial del monorepo. Termina con `docker compose up` arrancando una app vacía respondiendo `/health`.
 
-- [ ] T001 Crear estructura de monorepo: `backend/`, `frontend/`, `ops/`, `.gitignore`, `README.md` en raíz.
-- [ ] T002 [P] Inicializar backend Python con `uv` o Poetry en [backend/pyproject.toml](backend/pyproject.toml) declarando deps: `fastapi`, `uvicorn[standard]`, `sqlalchemy>=2.0`, `alembic`, `pymysql`, `pydantic>=2`, `pydantic-settings`, `authlib`, `itsdangerous`, `python-multipart`, `pytesseract`, `pdf2image`, `structlog`, `slowapi`, `prometheus-client`, `sentry-sdk`.
-- [ ] T003 [P] Inicializar frontend con Vite + React + TS en [frontend/package.json](frontend/package.json) declarando deps: `react`, `react-dom`, `react-router-dom`, `@tanstack/react-query`, `tailwindcss`, `@headlessui/react`, `lucide-react`, `react-hook-form`, `zod`.
-- [ ] T004 [P] Configurar Tailwind con tokens de la paleta REPSE (azules profundos + neutros + acentos de estado) en [frontend/tailwind.config.ts](frontend/tailwind.config.ts) y [frontend/src/styles/globals.css](frontend/src/styles/globals.css) (FR-016 del spec).
-- [ ] T005 [P] Configurar lint + format backend: `ruff`, `mypy --strict`, `pytest` en [backend/pyproject.toml](backend/pyproject.toml).
-- [ ] T006 [P] Configurar lint + format frontend: ESLint, Prettier, TypeScript strict en [frontend/tsconfig.json](frontend/tsconfig.json) y [frontend/eslint.config.js](frontend/eslint.config.js).
-- [ ] T007 Crear [ops/docker-compose.yml](ops/docker-compose.yml) con servicios `app` (backend), `frontend` (vite dev), `mysql` (8.0), `caddy` (reverse proxy). Volumen persistente `mysql_data` y `uploads`.
-- [ ] T008 [P] Crear [ops/Caddyfile](ops/Caddyfile) con `tls internal`, proxy `/api/*` → `app:8000`, proxy `/` → `frontend:5173` (dev) o estáticos buildeados (prod).
-- [ ] T009 [P] Crear [ops/.env.example](ops/.env.example) documentando todas las variables del [quickstart.md](./quickstart.md).
-- [ ] T010 Crear endpoint trivial `GET /health` en [backend/src/repse/main.py](backend/src/repse/main.py) que retorna `{"status":"ok"}` para validar el stack arrancando.
+- [X] T001 Crear estructura de monorepo: `backend/`, `frontend/`, `ops/`, `.gitignore`, `README.md` en raíz.
+- [X] T002 [P] Inicializar backend Python con `uv` o Poetry en [backend/pyproject.toml](backend/pyproject.toml) declarando deps: `fastapi`, `uvicorn[standard]`, `sqlalchemy>=2.0`, `alembic`, `pymysql`, `pydantic>=2`, `pydantic-settings`, `authlib`, `itsdangerous`, `python-multipart`, `pytesseract`, `pdf2image`, `structlog`, `slowapi`, `prometheus-client`, `sentry-sdk`.
+- [X] T003 [P] Inicializar frontend con Vite + React + TS en [frontend/package.json](frontend/package.json) declarando deps: `react`, `react-dom`, `react-router-dom`, `@tanstack/react-query`, `tailwindcss`, `@headlessui/react`, `lucide-react`, `react-hook-form`, `zod`.
+- [X] T004 [P] Configurar Tailwind con tokens de la paleta REPSE (azules profundos + neutros + acentos de estado) en [frontend/tailwind.config.ts](frontend/tailwind.config.ts) y [frontend/src/styles/globals.css](frontend/src/styles/globals.css) (FR-016 del spec).
+- [X] T005 [P] Configurar lint + format backend: `ruff`, `mypy --strict`, `pytest` en [backend/pyproject.toml](backend/pyproject.toml).
+- [X] T006 [P] Configurar lint + format frontend: ESLint, Prettier, TypeScript strict en [frontend/tsconfig.json](frontend/tsconfig.json) y [frontend/eslint.config.js](frontend/eslint.config.js).
+- [X] T007 Crear [ops/docker-compose.yml](ops/docker-compose.yml) con servicios `app` (backend), `frontend` (vite dev), `mysql` (8.0), `caddy` (reverse proxy). Volumen persistente `mysql_data` y `uploads`.
+- [X] T008 [P] Crear [ops/Caddyfile](ops/Caddyfile) con `tls internal`, proxy `/api/*` → `app:8000`, proxy `/` → `frontend:5173` (dev) o estáticos buildeados (prod).
+- [X] T009 [P] Crear [ops/.env.example](ops/.env.example) documentando todas las variables del [quickstart.md](./quickstart.md).
+- [X] T010 Crear endpoint trivial `GET /health` en [backend/src/repse/main.py](backend/src/repse/main.py) que retorna `{"status":"ok"}` para validar el stack arrancando.
 
 **Checkpoint**: `docker compose up` levanta la app, `curl https://localhost/api/health` responde 200, frontend monta vacío.
 
@@ -49,29 +49,29 @@ Monorepo: `backend/` (FastAPI + SQLAlchemy + Alembic), `frontend/` (Vite + React
 
 **⚠️ CRITICAL**: ninguna user story puede empezar hasta cerrar esta fase.
 
-- [ ] T011 Crear configuración Pydantic Settings en [backend/src/repse/config.py](backend/src/repse/config.py) cargando todas las variables de entorno del [quickstart.md](./quickstart.md) (DB, OIDC, APP_SECRET, UPLOAD_ROOT, TESSERACT_LANG, SENTRY_DSN).
-- [ ] T012 [P] Configurar structlog (JSON renderer, request_id/tenant_id/user_id context) en [backend/src/repse/logging.py](backend/src/repse/logging.py).
-- [ ] T013 [P] Setup global de Sentry/GlitchTip (opt-in vía `SENTRY_DSN` vacío = deshabilitado) en [backend/src/repse/main.py](backend/src/repse/main.py).
-- [ ] T014 Crear SQLAlchemy `DeclarativeBase` con naming convention determinista (research.md §2) en [backend/src/repse/db/base.py](backend/src/repse/db/base.py).
-- [ ] T015 Crear session factory + async/sync engine + dependency `get_db` en [backend/src/repse/db/session.py](backend/src/repse/db/session.py).
-- [ ] T016 Implementar mixin `TenantOwned` + event listener `before_compile` que inyecta `WHERE organization_id = :current_tenant_id` (research.md §2) en [backend/src/repse/db/tenant_filter.py](backend/src/repse/db/tenant_filter.py).
-- [ ] T017 Inicializar Alembic + configurar `env.py` para descubrir todos los modelos del paquete `repse.*` en [backend/alembic.ini](backend/alembic.ini), [backend/alembic/env.py](backend/alembic/env.py), [backend/alembic/script.py.mako](backend/alembic/script.py.mako).
-- [ ] T018 [P] Implementar middleware de request ID + structlog binding en [backend/src/repse/middleware/request_context.py](backend/src/repse/middleware/request_context.py).
-- [ ] T019 [P] Implementar rate limiting con `slowapi` (10 req/min para auth callback, 60/min para uploads) en [backend/src/repse/middleware/rate_limit.py](backend/src/repse/middleware/rate_limit.py).
-- [ ] T020 [P] Implementar envelope de errores `{"error": {"code", "message", "details"}}` y exception handler global en [backend/src/repse/errors.py](backend/src/repse/errors.py).
-- [ ] T021 [P] Implementar `FileStore` con backend `LocalDisk` + tokens JWS firmados con `itsdangerous` (TTL 5 min, validan organization_id) en [backend/src/repse/documents/storage.py](backend/src/repse/documents/storage.py).
-- [ ] T022 [P] Implementar wrapper de Tesseract OCR con `pytesseract` + `pdf2image` (regex de RFC + fechas en español) en [backend/src/repse/documents/ocr.py](backend/src/repse/documents/ocr.py).
-- [ ] T023 [P] Implementar calculadora de vencimiento `compute_due_date(coverage_period, periodicity)` con reglas SAT/IMSS (research.md §3) en [backend/src/repse/documents/expiration.py](backend/src/repse/documents/expiration.py).
-- [ ] T024 Implementar bootstrap de catálogo canónico de `DocumentType` (research.md §9) como migration data-only en [backend/alembic/versions/0002_seed_canonical_doc_types.py](backend/alembic/versions/0002_seed_canonical_doc_types.py).
-- [ ] T025 Implementar provisioning de Organization: crea `SupplierType` "Sin clasificar" (`origin='system'`) + siembra `SupplierTypeDocumentRequirement` para todos los `DocumentType` canónicos activos (FR-013 del spec 003) en [backend/src/repse/supplier_types/provisioning.py](backend/src/repse/supplier_types/provisioning.py).
-- [ ] T026 Implementar clients OIDC (Google + Microsoft) con `Authlib` en [backend/src/repse/auth/oidc.py](backend/src/repse/auth/oidc.py).
-- [ ] T027 Implementar gestión de sesión + cookie firmada con `itsdangerous` en [backend/src/repse/auth/session.py](backend/src/repse/auth/session.py).
-- [ ] T028 Implementar dependencies `current_user`, `current_tenant`, `require_role(*roles)` en [backend/src/repse/auth/dependencies.py](backend/src/repse/auth/dependencies.py).
-- [ ] T029 [P] Implementar servicio de bitácora `audit_log.write(action, entity_type, entity_id, metadata)` + helper para acciones del sistema (`actor_user_id=NULL`) en [backend/src/repse/audit/service.py](backend/src/repse/audit/service.py).
-- [ ] T030 [P] Implementar endpoint `/metrics` con `prometheus_client` (request_count, latency_histogram, error_rate) en [backend/src/repse/observability/metrics.py](backend/src/repse/observability/metrics.py).
-- [ ] T031 [P] Frontend: configurar React Router + Tanstack Query + AuthProvider + ThemeProvider en [frontend/src/app/providers.tsx](frontend/src/app/providers.tsx) y [frontend/src/app/router.tsx](frontend/src/app/router.tsx).
-- [ ] T032 [P] Frontend: implementar fetch wrapper con manejo de cookies de sesión, errores y refresco automático en [frontend/src/lib/api.ts](frontend/src/lib/api.ts).
-- [ ] T033 [P] Frontend: componentes UI primitivos (`Button`, `Card`, `Badge`, `Table`, `Modal`, `Tabs`, `FormField`) en [frontend/src/components/ui/](frontend/src/components/ui/).
+- [X] T011 Crear configuración Pydantic Settings en [backend/src/repse/config.py](backend/src/repse/config.py) cargando todas las variables de entorno del [quickstart.md](./quickstart.md) (DB, OIDC, APP_SECRET, UPLOAD_ROOT, TESSERACT_LANG, SENTRY_DSN).
+- [X] T012 [P] Configurar structlog (JSON renderer, request_id/tenant_id/user_id context) en [backend/src/repse/logging.py](backend/src/repse/logging.py).
+- [X] T013 [P] Setup global de Sentry/GlitchTip (opt-in vía `SENTRY_DSN` vacío = deshabilitado) en [backend/src/repse/main.py](backend/src/repse/main.py).
+- [X] T014 Crear SQLAlchemy `DeclarativeBase` con naming convention determinista (research.md §2) en [backend/src/repse/db/base.py](backend/src/repse/db/base.py).
+- [X] T015 Crear session factory + async/sync engine + dependency `get_db` en [backend/src/repse/db/session.py](backend/src/repse/db/session.py).
+- [X] T016 Implementar mixin `TenantOwned` + event listener `before_compile` que inyecta `WHERE organization_id = :current_tenant_id` (research.md §2) en [backend/src/repse/db/tenant_filter.py](backend/src/repse/db/tenant_filter.py).
+- [X] T017 Inicializar Alembic + configurar `env.py` para descubrir todos los modelos del paquete `repse.*` en [backend/alembic.ini](backend/alembic.ini), [backend/alembic/env.py](backend/alembic/env.py), [backend/alembic/script.py.mako](backend/alembic/script.py.mako).
+- [X] T018 [P] Implementar middleware de request ID + structlog binding en [backend/src/repse/middleware/request_context.py](backend/src/repse/middleware/request_context.py).
+- [X] T019 [P] Implementar rate limiting con `slowapi` (10 req/min para auth callback, 60/min para uploads) en [backend/src/repse/middleware/rate_limit.py](backend/src/repse/middleware/rate_limit.py).
+- [X] T020 [P] Implementar envelope de errores `{"error": {"code", "message", "details"}}` y exception handler global en [backend/src/repse/errors.py](backend/src/repse/errors.py).
+- [X] T021 [P] Implementar `FileStore` con backend `LocalDisk` + tokens JWS firmados con `itsdangerous` (TTL 5 min, validan organization_id) en [backend/src/repse/documents/storage.py](backend/src/repse/documents/storage.py).
+- [X] T022 [P] Implementar wrapper de Tesseract OCR con `pytesseract` + `pdf2image` (regex de RFC + fechas en español) en [backend/src/repse/documents/ocr.py](backend/src/repse/documents/ocr.py).
+- [X] T023 [P] Implementar calculadora de vencimiento `compute_due_date(coverage_period, periodicity)` con reglas SAT/IMSS (research.md §3) en [backend/src/repse/documents/expiration.py](backend/src/repse/documents/expiration.py).
+- [X] T024 Implementar bootstrap de catálogo canónico de `DocumentType` (research.md §9) como migration data-only en [backend/alembic/versions/0002_seed_canonical_doc_types.py](backend/alembic/versions/0002_seed_canonical_doc_types.py).
+- [X] T025 Implementar provisioning de Organization: crea `SupplierType` "Sin clasificar" (`origin='system'`) + siembra `SupplierTypeDocumentRequirement` para todos los `DocumentType` canónicos activos (FR-013 del spec 003) en [backend/src/repse/supplier_types/provisioning.py](backend/src/repse/supplier_types/provisioning.py).
+- [X] T026 Implementar clients OIDC (Google + Microsoft) con `Authlib` en [backend/src/repse/auth/oidc.py](backend/src/repse/auth/oidc.py).
+- [X] T027 Implementar gestión de sesión + cookie firmada con `itsdangerous` en [backend/src/repse/auth/session.py](backend/src/repse/auth/session.py).
+- [X] T028 Implementar dependencies `current_user`, `current_tenant`, `require_role(*roles)` en [backend/src/repse/auth/dependencies.py](backend/src/repse/auth/dependencies.py).
+- [X] T029 [P] Implementar servicio de bitácora `audit_log.write(action, entity_type, entity_id, metadata)` + helper para acciones del sistema (`actor_user_id=NULL`) en [backend/src/repse/audit/service.py](backend/src/repse/audit/service.py).
+- [X] T030 [P] Implementar endpoint `/metrics` con `prometheus_client` (request_count, latency_histogram, error_rate) en [backend/src/repse/observability/metrics.py](backend/src/repse/observability/metrics.py).
+- [X] T031 [P] Frontend: configurar React Router + Tanstack Query + AuthProvider + ThemeProvider en [frontend/src/app/providers.tsx](frontend/src/app/providers.tsx) y [frontend/src/app/router.tsx](frontend/src/app/router.tsx).
+- [X] T032 [P] Frontend: implementar fetch wrapper con manejo de cookies de sesión, errores y refresco automático en [frontend/src/lib/api.ts](frontend/src/lib/api.ts).
+- [X] T033 [P] Frontend: componentes UI primitivos (`Button`, `Card`, `Badge`, `Table`, `Modal`, `Tabs`, `FormField`) en [frontend/src/components/ui/](frontend/src/components/ui/).
 
 **Checkpoint**: capa de datos lista, OIDC conectable, multi-tenant filter activo, OCR/expiration/file storage probables; user stories pueden empezar.
 
