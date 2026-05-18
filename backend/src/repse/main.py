@@ -24,7 +24,10 @@ from repse.documents.routes import router as documents_router
 from repse.document_types.routes import router as document_types_router
 from repse.organizations.routes import router as organizations_router
 from repse.suppliers.routes import router as suppliers_router
-from repse.supplier_types.routes import router as supplier_types_router
+from repse.supplier_types.routes import (
+    requirements_router as supplier_type_requirements_router,
+    router as supplier_types_router,
+)
 from repse.users.routes import router as users_router
 
 
@@ -89,6 +92,7 @@ app.include_router(auth_router, prefix=f"{API_PREFIX}/auth", tags=["auth"])
 app.include_router(organizations_router, prefix=f"{API_PREFIX}/organization", tags=["organization"])
 app.include_router(users_router, prefix=f"{API_PREFIX}/users", tags=["users"])
 app.include_router(supplier_types_router, prefix=f"{API_PREFIX}/supplier-types", tags=["supplier-types"])
+app.include_router(supplier_type_requirements_router, prefix=f"{API_PREFIX}/supplier-type-requirements", tags=["supplier-type-requirements"])
 app.include_router(document_types_router, prefix=f"{API_PREFIX}/document-types", tags=["document-types"])
 app.include_router(suppliers_router, prefix=f"{API_PREFIX}/suppliers", tags=["suppliers"])
 app.include_router(documents_router, prefix=f"{API_PREFIX}", tags=["documents"])

@@ -32,7 +32,9 @@ export const authApi = {
   logout: () => apiFetch<void>("/auth/logout", { method: "POST" }),
 };
 
-// ---------- Supplier Types (read-only here) ----------
+// ---------- Supplier Types (read + admin write, spec 003) ----------
+
+export type Periodicity = "monthly" | "bimonthly" | "annual" | "none";
 
 export type SupplierTypeItem = {
   id: number;
@@ -42,28 +44,108 @@ export type SupplierTypeItem = {
   status: "active" | "archived";
   supplier_count: number;
   requirement_count: number;
+  updated_at: string;
+};
+
+export type RequirementItem = {
+  id: number;
+  document_type: {
+    id: number;
+    slug: string;
+    name: string;
+    periodicity: Periodicity;
+    origin: "canonical" | "custom";
+    status: "active" | "archived";
+  };
+  periodicity_override: Periodicity | null;
+  periodicity_effective: Periodicity;
+  status: "active" | "retired";
+  created_at: string;
+  updated_at: string;
+};
+
+export type SupplierTypeDetail = SupplierTypeItem & {
+  requirements?: RequirementItem[];
 };
 
 export const supplierTypesApi = {
-  list: () =>
-    apiFetch<{ items: SupplierTypeItem[] }>("/supplier-types?status=active"),
+  list: (status: "active" | "archived" | "all" = "active") =>
+    apiFetch<{ items: SupplierTypeItem[] }>(`/supplier-types?status=${status}`),
+  detail: (id: number) =>
+    apiFetch<SupplierTypeDetail>(`/supplier-types/${id}?include_requirements=true`),
+  create: (body: { name: string; description?: string }) =>
+    apiFetch<SupplierTypeItem>("/supplier-types", { method: "POST", json: body }),
+  update: (id: number, etag: string, body: { name?: string; description?: string }) =>
+    apiFetch<SupplierTypeItem>(`/supplier-types/${id}`, { method: "PATCH", etag, json: body }),
+  archive: (id: number, reason?: string) =>
+    apiFetch<SupplierTypeItem & { affected_suppliers_count: number }>(
+      `/supplier-types/${id}/archive`,
+      { method: "POST", json: { reason: reason ?? null } }
+    ),
+  restore: (id: number) =>
+    apiFetch<SupplierTypeItem>(`/supplier-types/${id}/restore`, { method: "POST" }),
+  delete: (id: number, etag: string) =>
+    apiFetch<void>(`/supplier-types/${id}`, { method: "DELETE", etag }),
+  addRequirement: (
+    id: number,
+    body: { document_type_id: number; periodicity_override: Periodicity | null }
+  ) =>
+    apiFetch<RequirementItem>(`/supplier-types/${id}/requirements`, {
+      method: "POST",
+      json: body,
+    }),
+  updateRequirement: (
+    reqId: number,
+    etag: string,
+    body: { periodicity_override: Periodicity | null }
+  ) =>
+    apiFetch<RequirementItem>(`/supplier-type-requirements/${reqId}`, {
+      method: "PATCH",
+      etag,
+      json: body,
+    }),
+  retireRequirement: (reqId: number, etag: string) =>
+    apiFetch<void>(`/supplier-type-requirements/${reqId}`, { method: "DELETE", etag }),
 };
 
-// ---------- Document Types (read-only here) ----------
+// ---------- Document Types (read + admin write, spec 003) ----------
 
 export type DocumentTypeItem = {
   id: number;
   slug: string;
   name: string;
   description: string | null;
-  periodicity: "monthly" | "bimonthly" | "annual" | "none";
+  periodicity: Periodicity;
   origin: "canonical" | "custom";
   status: "active" | "archived";
   active: boolean;
+  updated_at: string;
 };
 
 export const documentTypesApi = {
-  list: () => apiFetch<{ items: DocumentTypeItem[] }>("/document-types"),
+  list: (includeInactive = false) =>
+    apiFetch<{ items: DocumentTypeItem[] }>(
+      `/document-types${includeInactive ? "?include_inactive=true" : ""}`
+    ),
+  create: (body: { name: string; description?: string; periodicity: Periodicity }) =>
+    apiFetch<DocumentTypeItem>("/document-types", { method: "POST", json: body }),
+  update: (
+    id: number,
+    etag: string,
+    body: { name?: string; description?: string; periodicity?: Periodicity }
+  ) =>
+    apiFetch<DocumentTypeItem>(`/document-types/${id}`, { method: "PATCH", etag, json: body }),
+  toggleCanonical: (id: number, active: boolean, reason?: string) =>
+    apiFetch<{ id: number; slug: string; name: string; active: boolean }>(
+      `/document-types/${id}/toggle-active`,
+      { method: "POST", json: { active, reason: reason ?? null } }
+    ),
+  archive: (id: number) =>
+    apiFetch<DocumentTypeItem>(`/document-types/${id}/archive`, { method: "POST" }),
+  restore: (id: number) =>
+    apiFetch<DocumentTypeItem>(`/document-types/${id}/restore`, { method: "POST" }),
+  delete: (id: number, etag: string) =>
+    apiFetch<void>(`/document-types/${id}`, { method: "DELETE", etag }),
 };
 
 // ---------- Suppliers ----------

@@ -6,6 +6,10 @@ import { ApiError } from "@/lib/api";
 import { authApi } from "@/lib/api/index";
 import { useAuth } from "@/lib/auth";
 import { LoginPage } from "@/pages/auth/login";
+import { CatalogsHub } from "@/pages/settings/catalogs/index";
+import { DocumentTypesPage } from "@/pages/settings/catalogs/document-types";
+import { SupplierTypeDetailPage } from "@/pages/settings/catalogs/supplier-type-detail";
+import { SupplierTypesPage } from "@/pages/settings/catalogs/supplier-types";
 import { SupplierDetailPage } from "@/pages/suppliers/detail";
 import { SuppliersListPage } from "@/pages/suppliers/list";
 import { NewSupplierPage } from "@/pages/suppliers/new";
@@ -21,7 +25,12 @@ export function AppRouter() {
           <Route path="suppliers/new" element={<NewSupplierPage />} />
           <Route path="suppliers/:id" element={<SupplierDetailPage />} />
           <Route path="documents" element={<Placeholder title="Documentos" />} />
-          <Route path="settings" element={<Placeholder title="Configuración" />} />
+          <Route path="settings" element={<Navigate to="/settings/catalogs" replace />} />
+          <Route path="settings/catalogs" element={<CatalogsHub />}>
+            <Route path="document-types" element={<DocumentTypesPage />} />
+            <Route path="supplier-types" element={<SupplierTypesPage />} />
+            <Route path="supplier-types/:id" element={<SupplierTypeDetailPage />} />
+          </Route>
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
