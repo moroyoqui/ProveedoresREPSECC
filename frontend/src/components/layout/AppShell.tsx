@@ -1,16 +1,24 @@
 import { Link, Outlet, useLocation } from "react-router-dom";
-import { Building2, FileStack, LayoutDashboard, LogOut, Settings } from "lucide-react";
+import { Building2, FileStack, LayoutDashboard, LogOut, Settings, Users } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 
 import { authApi } from "@/lib/api/index";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/components/ui";
 
-const NAV = [
+type NavItem = {
+  to: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  adminOnly?: boolean;
+};
+
+const NAV: NavItem[] = [
   { to: "/", label: "Tablero", icon: LayoutDashboard },
   { to: "/suppliers", label: "Proveedores", icon: Building2 },
   { to: "/documents", label: "Documentos", icon: FileStack },
-  { to: "/settings", label: "Configuración", icon: Settings },
+  { to: "/users", label: "Usuarios", icon: Users, adminOnly: true },
+  { to: "/settings", label: "Configuración", icon: Settings, adminOnly: true },
 ];
 
 export function AppShell() {
@@ -52,7 +60,7 @@ export function AppShell() {
           </div>
         )}
         <nav className="flex-1 p-3">
-          {NAV.map((item) => {
+          {NAV.filter((item) => !item.adminOnly || user?.role === "admin").map((item) => {
             const Icon = item.icon;
             const active = location.pathname.startsWith(item.to) && item.to !== "/" || location.pathname === item.to;
             return (

@@ -12,6 +12,12 @@ export default defineConfig({
   server: {
     host: true,
     port: 5173,
+    // Polling is required because the source lives on a Windows host
+    // bind-mounted into a Linux container — inotify events don't propagate.
+    watch: {
+      usePolling: true,
+      interval: 500,
+    },
     proxy: {
       "/api": {
         target: "http://app:8000",

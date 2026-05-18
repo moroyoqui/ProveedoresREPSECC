@@ -32,6 +32,41 @@ export const authApi = {
   logout: () => apiFetch<void>("/auth/logout", { method: "POST" }),
 };
 
+// ---------- Users (admin only) ----------
+
+export type UserStatus = "active" | "disabled";
+
+export type UserItem = {
+  id: number;
+  email: string;
+  display_name: string;
+  role: Role;
+  status: UserStatus;
+  last_login_at: string | null;
+};
+
+export type UserCreate = {
+  email: string;
+  display_name: string;
+  role: Role;
+  password?: string;
+};
+
+export type UserPatch = {
+  display_name?: string;
+  role?: Role;
+  status?: UserStatus;
+  password?: string;
+};
+
+export const usersApi = {
+  list: () => apiFetch<{ items: UserItem[] }>("/users"),
+  create: (body: UserCreate) => apiFetch<UserItem>("/users", { method: "POST", json: body }),
+  update: (id: number, body: UserPatch) =>
+    apiFetch<UserItem>(`/users/${id}`, { method: "PATCH", json: body }),
+  disable: (id: number) => apiFetch<void>(`/users/${id}`, { method: "DELETE" }),
+};
+
 // ---------- Supplier Types (read + admin write, spec 003) ----------
 
 export type Periodicity = "monthly" | "bimonthly" | "annual" | "none";
