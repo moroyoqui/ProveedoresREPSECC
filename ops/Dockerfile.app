@@ -31,7 +31,13 @@ RUN useradd --create-home --uid 1000 app \
  && mkdir -p /var/repse/uploads \
  && chown -R app:app /var/repse \
  && chmod 700 /var/repse/uploads
-USER app
+
+# Entrypoint corre como root: normaliza el dueño del volumen de uploads
+# (defensa contra `docker compose run` que pudo escribir como root) y dropea
+# a 'app' via runuser antes de exec del CMD.
+COPY ops/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 EXPOSE 8000
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 CMD ["uvicorn", "repse.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers"]

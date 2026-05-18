@@ -5,6 +5,7 @@ from __future__ import annotations
 from enum import StrEnum
 from functools import lru_cache
 from pathlib import Path
+from urllib.parse import quote_plus
 
 from pydantic import Field, SecretStr, ValidationInfo, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -64,8 +65,10 @@ class Settings(BaseSettings):
 
     @property
     def db_url(self) -> str:
+        user = quote_plus(self.db_user)
+        password = quote_plus(self.db_pass.get_secret_value())
         return (
-            f"mysql+pymysql://{self.db_user}:{self.db_pass.get_secret_value()}"
+            f"mysql+pymysql://{user}:{password}"
             f"@{self.db_host}:{self.db_port}/{self.db_name}?charset=utf8mb4"
         )
 

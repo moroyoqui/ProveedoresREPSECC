@@ -243,7 +243,32 @@ Monorepo: `backend/` (FastAPI + SQLAlchemy + Alembic), `frontend/` (Vite + React
 - [ ] T105 [P] [US2] Página "Tablero" minimal del tenant: 4 cards con totales (proveedores activos, % cumplimiento global, en riesgo, por vencer 30 d). Sin gráficos (eso es spec 005). En [frontend/src/pages/dashboard/index.tsx](frontend/src/pages/dashboard/index.tsx).
 - [ ] T106 [P] [US2] E2E Playwright US2: tenant con datos sembrados → abrir detalle de proveedor → ver estados correctos → marcar verificado → ver badge "Verificado" en [frontend/tests/e2e/us2_compliance_view.spec.ts](frontend/tests/e2e/us2_compliance_view.spec.ts).
 
-**Checkpoint**: US1 + US2 completas. Un usuario puede gestionar proveedores, cargar documentos, ver estado de cumplimiento por proveedor y por tenant, marcar verificación y consultar el historial completo de un documento.
+### Addendum US2: vista global "Documentos" en el menú (FR-012a desde `/documents`)
+
+> Hasta aquí FR-012a (marcar como verificado) vive solo en el detalle del documento dentro del proveedor (T104). Esta sección **expone la operación desde el ítem "Documentos" del menú lateral** ya cableado en [frontend/src/components/layout/AppShell.tsx:19](frontend/src/components/layout/AppShell.tsx), reemplazando el `<Placeholder title="Documentos" />` actual en [frontend/src/app/router.tsx:30](frontend/src/app/router.tsx) por una **lista global filtrable de todos los documentos del tenant** con la acción "Verificar" en cada fila. Reutiliza endpoint `GET /api/v1/documents` (T073) y `<VerifyDialog>` (T104).
+
+#### Tests obligatorios (rutas críticas: filtros + verificación desde lista global)
+
+- [ ] T135 [P] [US2] Contract test: `GET /api/v1/documents` acepta filtros `verified=true|false`, `status`, `supplier_id`, `document_type_id`, `q` (búsqueda libre sobre nombre de proveedor + slug de tipo), paginación cursor; cada fila incluye `supplier: {id, legal_name}`; multi-tenant negativo (org A no ve documentos de org B, responde 200 con lista vacía) en [backend/tests/contract/test_documents_list_contract.py](backend/tests/contract/test_documents_list_contract.py).
+- [ ] T136 [P] [US2] E2E Playwright: login → click "Documentos" en sidebar → ver lista global del tenant → filtrar por `verified=false` → desde una fila abrir `<VerifyDialog>` → escribir nota → confirmar → assert: `<VerifiedBadge>` cambia a "Verificado" sin recargar página y la fila desaparece del filtro `verified=false` en [frontend/tests/e2e/us2_documents_menu_verify.spec.ts](frontend/tests/e2e/us2_documents_menu_verify.spec.ts).
+
+#### Backend
+
+- [ ] T137 [US2] Extender el endpoint `GET /api/v1/documents` (T073) en [backend/src/repse/documents/routes.py](backend/src/repse/documents/routes.py) para aceptar los filtros del T135 (`verified`, `status`, `supplier_id`, `document_type_id`, `q`) y enriquecer cada respuesta con el `supplier` mínimo (`id`, `legal_name`) que la nueva vista necesita para la columna "Proveedor".
+- [ ] T138 [P] [US2] Actualizar `DocumentOut` para incluir el campo opcional `supplier: SupplierMiniOut | None` (poblado solo en endpoints de listado global, NULL cuando el proveedor ya está implícito en el path) en [backend/src/repse/documents/schemas.py](backend/src/repse/documents/schemas.py).
+- [ ] T139 [P] [US2] Documentar los nuevos filtros y el campo `supplier` en el contrato de documentos en [specs/001-repse-compliance-tracker/contracts/documents.md](specs/001-repse-compliance-tracker/contracts/documents.md).
+
+#### Frontend
+
+- [ ] T140 [P] [US2] Hook + query Tanstack `useDocumentsList(filters)` envolviendo `GET /api/v1/documents` con paginación cursor y `keepPreviousData` para transiciones suaves al cambiar filtros en [frontend/src/lib/api/documents.ts](frontend/src/lib/api/documents.ts).
+- [ ] T141 [P] [US2] Componente `<DocumentFiltersBar>` con selects controlados (Proveedor, DocumentType, status, verified) y `<input q>` con debounce 300 ms; sincroniza estado con search params de la URL para que filtros sean compartibles vía link en [frontend/src/components/documents/DocumentFiltersBar.tsx](frontend/src/components/documents/DocumentFiltersBar.tsx).
+- [ ] T142 [P] [US2] Componente `<VerifiedBadge document>` que renderiza "Verificado" / "Sin verificar" con tooltip de usuario + fecha cuando aplica (FR-011c), independiente del `<StatusBadge>` de vigencia en [frontend/src/components/documents/VerifiedBadge.tsx](frontend/src/components/documents/VerifiedBadge.tsx).
+- [ ] T143 [US2] Página `/documents` que reemplaza `<Placeholder title="Documentos" />` en [frontend/src/app/router.tsx](frontend/src/app/router.tsx) (línea 30): renderiza `<DocumentFiltersBar>` + tabla con columnas (Proveedor, Tipo, Periodo, `<StatusBadge>`, `<VerifiedBadge>`, "Agregado", Acciones) consumiendo `useDocumentsList`; cada fila ofrece botón "Verificar" que abre `<VerifyDialog>` (T104), o "Quitar verificación" si admin y ya verificado, en [frontend/src/pages/documents/list.tsx](frontend/src/pages/documents/list.tsx).
+- [ ] T144 [US2] Wire-up final: importar `DocumentsListPage` en [frontend/src/app/router.tsx](frontend/src/app/router.tsx), cambiar línea 30 a `<Route path="documents" element={<DocumentsListPage />} />`, y eliminar la función local `Placeholder` si queda huérfana (verificar que `/users` y `/settings` ya no la usan) en [frontend/src/app/router.tsx](frontend/src/app/router.tsx).
+
+**Checkpoint addendum**: el ítem "Documentos" del menú lateral abre una vista global del tenant con todos los documentos filtrables por proveedor/tipo/estado/verificado/búsqueda; cualquier fila puede marcarse "Verificado" reutilizando `<VerifyDialog>`, el `<VerifiedBadge>` se actualiza in-place sin recargar, y la paginación cursor mantiene scroll/posición.
+
+**Checkpoint**: US1 + US2 completas. Un usuario puede gestionar proveedores, cargar documentos, ver estado de cumplimiento por proveedor y por tenant, marcar verificación (tanto desde el detalle del documento como desde la vista global `/documents`) y consultar el historial completo de un documento.
 
 ---
 
@@ -294,13 +319,14 @@ Monorepo: `backend/` (FastAPI + SQLAlchemy + Alembic), `frontend/` (Vite + React
 - T091 (status_calculator) → T092 (recalculator) → T094 (aggregate) → T095 (detail enriched).
 - T096–T100 (endpoints) dependen de los servicios.
 - T101–T106 (frontend) dependen de los endpoints.
+- **Addendum vista global Documentos (T135–T144)**: T137 (extender `GET /documents`) depende de T073 (endpoint base) y T138 (schema `supplier`) puede ir paralelo. T143 (página) depende de T140 (hook), T141 (filters), T142 (badge) y T104 (`<VerifyDialog>`, existente en US2). T144 (wire-up router) depende de T143. T136 (E2E) depende de T143 + T144 + T137. T135 paralelo a todo el backend.
 
 ### Parallel Opportunities
 
 - Phase 1: T002–T006 todos paralelos (lenguajes/lints distintos).
 - Phase 2: T011/T012/T013/T018/T019/T020/T029/T030/T031/T032/T033 paralelos; modelos solo dependen de T014 + T015 + T016.
 - Phase 3: dentro de Tests, los T034–T039 todos paralelos. Models T040–T048 paralelos. Schemas T050–T055 paralelos. Frontend T077–T086 paralelos entre sí.
-- Phase 4: T087–T090 (tests) paralelos. Frontend T101–T106 paralelos.
+- Phase 4: T087–T090 (tests) paralelos. Frontend T101–T106 paralelos. Addendum: T135 + T136 paralelos entre sí y con backend; T138 + T139 paralelos a T137; T140 + T141 + T142 paralelos entre sí (archivos distintos).
 - Phase 5: la mayoría son paralelos.
 
 ---
