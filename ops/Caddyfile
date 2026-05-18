@@ -2,7 +2,14 @@
 # En local: `tls internal` genera cert autofirmado confiable.
 # En prod: cambiar CADDY_DOMAIN a tu dominio público; Caddy obtiene cert ACME automáticamente.
 
-{$CADDY_DOMAIN} {
+# HTTP -> HTTPS redirect. El docker-compose mapea host:8080 -> container:80
+# y host:8443 -> container:443; el redirect default de Caddy no conoce los
+# puertos del host, por eso lo escribimos explícitamente.
+http://{$CADDY_DOMAIN} {
+    redir https://{$CADDY_DOMAIN}:8443{uri} permanent
+}
+
+https://{$CADDY_DOMAIN} {
     tls internal
 
     encode gzip zstd
