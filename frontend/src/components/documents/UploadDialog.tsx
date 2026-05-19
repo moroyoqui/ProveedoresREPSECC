@@ -7,15 +7,19 @@ import { documentTypesApi, documentsApi } from "@/lib/api/index";
 
 export function UploadDialog({
   supplierId,
+  initialDocTypeId,
+  initialCoverage,
   onClose,
 }: {
   supplierId: number;
+  initialDocTypeId?: number | null;
+  initialCoverage?: string | null;
   onClose: (uploaded?: boolean) => void;
 }) {
   const qc = useQueryClient();
   const [file, setFile] = useState<File | null>(null);
-  const [docTypeId, setDocTypeId] = useState<number | null>(null);
-  const [coverage, setCoverage] = useState<string>("");
+  const [docTypeId, setDocTypeId] = useState<number | null>(initialDocTypeId ?? null);
+  const [coverage, setCoverage] = useState<string>(initialCoverage ?? "");
   const [error, setError] = useState<string | null>(null);
 
   const {
@@ -32,6 +36,7 @@ export function UploadDialog({
     mutationFn: documentsApi.upload,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["supplier", supplierId] });
+      qc.invalidateQueries({ queryKey: ["supplier-compliance", supplierId] });
       onClose(true);
     },
     onError: (e: unknown) => {

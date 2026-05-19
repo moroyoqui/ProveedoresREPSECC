@@ -21,27 +21,36 @@ const LABEL: Record<CellStatus, string> = {
 };
 
 const MONTH_NAMES = [
-  "Enero",
-  "Febrero",
-  "Marzo",
-  "Abril",
-  "Mayo",
-  "Junio",
-  "Julio",
-  "Agosto",
-  "Septiembre",
-  "Octubre",
-  "Noviembre",
-  "Diciembre",
+  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
 ];
+
+export type UploadClickParams = {
+  document_type_id: number;
+  coverage_period_start: string | null;
+};
 
 export type ComplianceCellProps = {
   status: CellStatus;
   month?: number;
   size?: "sm" | "md";
+  document_id?: number | null;
+  document_type_id?: number;
+  coverage_period_start?: string | null;
+  onDocumentClick?: (documentId: number) => void;
+  onUploadClick?: (params: UploadClickParams) => void;
 };
 
-export function ComplianceCell({ status, month, size = "md" }: ComplianceCellProps) {
+export function ComplianceCell({
+  status,
+  month,
+  size = "md",
+  document_id,
+  document_type_id,
+  coverage_period_start,
+  onDocumentClick,
+  onUploadClick,
+}: ComplianceCellProps) {
   if (status === "not_required") {
     return (
       <span
@@ -51,17 +60,59 @@ export function ComplianceCell({ status, month, size = "md" }: ComplianceCellPro
     );
   }
 
-  const tooltip = month ? `${MONTH_NAMES[month - 1]}: ${LABEL[status]}` : LABEL[status];
+  const monthName = month ? MONTH_NAMES[month - 1] : null;
+  const label = monthName ? `${monthName}: ${LABEL[status]}` : LABEL[status];
   const dotSize = size === "sm" ? "h-3 w-3" : "h-4 w-4";
-
-  return (
+  const sphere = (
     <span
       role="img"
-      aria-label={tooltip}
-      title={tooltip}
+      aria-label={label}
+      title={label}
       className={`inline-block ${dotSize} rounded-full ${COLOR[status]} ring-1 ring-inset ring-black/5`}
     />
   );
+
+  const canOpenDoc =
+    (status === "validated" || status === "submitted" || status === "expired") &&
+    document_id != null &&
+    onDocumentClick != null;
+
+  const canUpload =
+    (status === "missing" || status === "pending") &&
+    document_type_id != null &&
+    onUploadClick != null;
+
+  if (canOpenDoc) {
+    return (
+      <button
+        type="button"
+        aria-label={label}
+        title={label}
+        className="cursor-pointer rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
+        onClick={() => onDocumentClick(document_id!)}
+      >
+        {sphere}
+      </button>
+    );
+  }
+
+  if (canUpload) {
+    return (
+      <button
+        type="button"
+        aria-label={`${label} — haz clic para subir documento`}
+        title={`${label} — haz clic para subir`}
+        className="cursor-pointer rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
+        onClick={() =>
+          onUploadClick({ document_type_id: document_type_id!, coverage_period_start: coverage_period_start ?? null })
+        }
+      >
+        {sphere}
+      </button>
+    );
+  }
+
+  return sphere;
 }
 
 export const COMPLIANCE_LEGEND: Array<{ status: CellStatus; label: string }> = [
@@ -71,4 +122,5 @@ export const COMPLIANCE_LEGEND: Array<{ status: CellStatus; label: string }> = [
   { status: "missing", label: "Faltante" },
   { status: "pending", label: "En plazo" },
   { status: "future", label: "Mes futuro" },
+  { status: "not_required", label: "No aplica" },
 ];

@@ -5,19 +5,23 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta, timezone
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Response, UploadFile
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from repse.audit import actions as audit_actions
+from repse.audit.models import AuditLog
 from repse.auth.dependencies import CurrentUser, current_user, require_role
 from repse.config import Settings, get_settings
 from repse.db.session import get_db
+from repse.document_types.models import DocumentType
 from repse.documents import service
 from repse.documents.models import Document, OcrStatus
 from repse.documents.service import UploadInput
 from repse.documents.storage import FileStore, InvalidToken, TokenExpired
-from repse.errors import Forbidden, NotFound
+from repse.errors import Forbidden, NotFound, ValidationFailure
+from repse.suppliers.models import Supplier
 from repse.users.models import Role, User
 
 router = APIRouter()
@@ -66,6 +70,9 @@ def upload_document(
 def list_documents(
     supplier_id: int | None = None,
     document_type_id: int | None = None,
+    status: str | None = None,
+    verified: bool | None = None,
+    q: str | None = None,
     is_latest: bool = True,
     limit: int = 20,
     user: CurrentUser = Depends(current_user),
@@ -78,11 +85,22 @@ def list_documents(
         stmt = stmt.where(Document.document_type_id == document_type_id)
     if is_latest:
         stmt = stmt.where(Document.is_latest.is_(True))
+    if verified is not None:
+        stmt = stmt.where(Document.verified.is_(verified))
+    if status is not None:
+        from repse.documents.models import DocumentStatus
+
+        stmt = stmt.where(Document.status == DocumentStatus(status))
+    if q:
+        # Join con Supplier para búsqueda libre por nombre de proveedor o slug de tipo
+        stmt = stmt.join(Supplier, Supplier.id == Document.supplier_id).where(
+            Supplier.legal_name.ilike(f"%{q}%")
+        )
     docs = db.execute(stmt.limit(limit + 1)).scalars().all()
     has_more = len(docs) > limit
     docs = docs[:limit]
     return {
-        "items": [_serialize(db, d) for d in docs],
+        "items": [_serialize(db, d, include_supplier=True) for d in docs],
         "next_cursor": None,
         "has_more": has_more,
     }
@@ -189,15 +207,129 @@ def unverify_document_route(
     return _serialize(db, doc)
 
 
+# ---------- Delete (with grace window) ----------
+
+
+@router.delete("/documents/{document_id}", status_code=204)
+def delete_document_route(
+    document_id: int,
+    user: CurrentUser = Depends(require_role(Role.ADMIN.value)),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    service.delete_document(
+        db,
+        document_id=document_id,
+        organization_id=user.organization_id,
+        actor_user_id=user.user_id,
+        grace_hours=settings.document_delete_grace_hours,
+        settings=settings,
+    )
+    return Response(status_code=204)
+
+
+# ---------- History (audit timeline for one document) ----------
+
+
+_HUMAN_SUMMARIES: dict[str, str] = {
+    audit_actions.DOCUMENT_UPLOADED: "Subió el documento",
+    audit_actions.DOCUMENT_VERIFIED: "Marcó como verificado",
+    audit_actions.DOCUMENT_UNVERIFIED: "Quitó la verificación",
+    audit_actions.DOCUMENT_DELETED: "Eliminó el documento",
+    audit_actions.DOCUMENT_DELETED_BY_SUPPLIER_TYPE_CHANGE: "Eliminado por cambio de tipo de proveedor",
+}
+
+_SYSTEM_SUMMARIES: dict[str, str] = {
+    audit_actions.DOCUMENT_OCR_COMPLETED: "Sistema · OCR completado",
+    audit_actions.DOCUMENTS_STATUS_RECALCULATED: "Sistema · Estado recalculado",
+}
+
+
+def _history_summary(action: str, *, is_human: bool, metadata: dict) -> str:
+    if is_human:
+        base = _HUMAN_SUMMARIES.get(action, action)
+        if action == audit_actions.DOCUMENT_UPLOADED and metadata.get("version"):
+            return f"Subió la versión {metadata['version']}"
+        return base
+    return _SYSTEM_SUMMARIES.get(action, f"Sistema · {action}")
+
+
+@router.get("/documents/{document_id}/history")
+def get_document_history(
+    document_id: int,
+    actor: str = Query("all", regex="^(human|system|all)$"),
+    limit: int = Query(50, ge=1, le=200),
+    user: CurrentUser = Depends(current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    doc = db.get(Document, document_id)
+    if doc is None:
+        raise NotFound("Document not found")
+
+    stmt = (
+        select(AuditLog)
+        .where(
+            AuditLog.entity_type == "document",
+            AuditLog.entity_id == document_id,
+        )
+        .order_by(AuditLog.created_at.asc(), AuditLog.id.asc())
+    )
+    if actor == "human":
+        stmt = stmt.where(AuditLog.actor_user_id.is_not(None))
+    elif actor == "system":
+        stmt = stmt.where(AuditLog.actor_user_id.is_(None))
+
+    rows = db.execute(stmt.limit(limit + 1)).scalars().all()
+    has_more = len(rows) > limit
+    rows = rows[:limit]
+
+    # Batch-load users.
+    user_ids = {r.actor_user_id for r in rows if r.actor_user_id is not None}
+    users_by_id: dict[int, User] = {}
+    if user_ids:
+        users_by_id = {
+            u.id: u
+            for u in db.execute(select(User).where(User.id.in_(user_ids))).scalars().all()
+        }
+
+    items: list[dict] = []
+    for row in rows:
+        is_human = row.actor_user_id is not None
+        metadata = row.metadata_ or {}
+        if is_human:
+            u = users_by_id.get(int(row.actor_user_id))  # type: ignore[arg-type]
+            actor_payload: dict = {
+                "type": "human",
+                "user": {
+                    "id": u.id if u else row.actor_user_id,
+                    "display_name": u.display_name if u else "(usuario eliminado)",
+                },
+            }
+        else:
+            actor_payload = {"type": "system", "user": None}
+        items.append(
+            {
+                "id": row.id,
+                "action": row.action,
+                "actor": actor_payload,
+                "summary": _history_summary(row.action, is_human=is_human, metadata=metadata),
+                "metadata": metadata,
+                "occurred_at": row.created_at,
+            }
+        )
+
+    return {"items": items, "next_cursor": None, "has_more": has_more}
+
+
 # ---------- Serializer ----------
 
 
-def _serialize(db: Session, doc: Document) -> dict:
+def _serialize(db: Session, doc: Document, *, include_supplier: bool = False) -> dict:
     uploader = db.get(User, doc.uploaded_by)
     last_updated_user = db.get(User, doc.last_updated_by) if doc.last_updated_by else None
     verified_user = db.get(User, doc.verified_by) if doc.verified_by else None
 
-    return {
+    payload: dict = {
         "id": doc.id,
         "supplier_id": doc.supplier_id,
         "document_type_id": doc.document_type_id,
@@ -255,7 +387,27 @@ def _serialize(db: Session, doc: Document) -> dict:
                 else None
             ),
         },
+        "supplier": None,
     }
+
+    if include_supplier:
+        supplier = db.get(Supplier, doc.supplier_id)
+        if supplier is not None:
+            payload["supplier"] = {"id": supplier.id, "legal_name": supplier.legal_name}
+
+    doc_type = db.get(DocumentType, doc.document_type_id)
+    payload["document_type"] = (
+        {
+            "id": doc_type.id,
+            "name": doc_type.name,
+            "slug": doc_type.slug,
+            "periodicity": doc_type.periodicity.value,
+        }
+        if doc_type
+        else {"id": doc.document_type_id, "name": f"Tipo #{doc.document_type_id}", "slug": "", "periodicity": "none"}
+    )
+
+    return payload
 
 
 # Used elsewhere

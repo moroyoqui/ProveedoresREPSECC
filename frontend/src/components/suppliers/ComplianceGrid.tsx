@@ -1,10 +1,17 @@
 import type { ComplianceGrid as ComplianceGridData } from "@/lib/api/index";
 
-import { COMPLIANCE_LEGEND, ComplianceCell } from "./ComplianceCell";
+import { COMPLIANCE_LEGEND, ComplianceCell, type UploadClickParams } from "./ComplianceCell";
+import type { CellStatus } from "@/lib/api/index";
 
 const MONTH_LABELS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 
-export function ComplianceGrid({ data }: { data: ComplianceGridData }) {
+type ComplianceGridProps = {
+  data: ComplianceGridData;
+  onDocumentClick?: (documentId: number) => void;
+  onUploadClick?: (params: UploadClickParams) => void;
+};
+
+export function ComplianceGrid({ data, onDocumentClick, onUploadClick }: ComplianceGridProps) {
   if (data.monthly_requirements.length === 0) {
     return (
       <div className="rounded border border-dashed border-neutral-300 bg-neutral-50 p-6 text-sm text-neutral-600">
@@ -69,7 +76,15 @@ export function ComplianceGrid({ data }: { data: ComplianceGridData }) {
                     }`}
                     role="cell"
                   >
-                    <ComplianceCell status={cell.status} month={cell.month} />
+                    <ComplianceCell
+                      status={cell.status}
+                      month={cell.month}
+                      document_id={cell.document_id}
+                      document_type_id={req.document_type.id}
+                      coverage_period_start={cell.coverage_period_start}
+                      onDocumentClick={onDocumentClick}
+                      onUploadClick={onUploadClick}
+                    />
                   </div>
                 );
               })}
@@ -85,13 +100,27 @@ export function ComplianceGrid({ data }: { data: ComplianceGridData }) {
 
 function ComplianceLegend() {
   return (
-    <ul className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-neutral-600">
-      {COMPLIANCE_LEGEND.map((item) => (
-        <li key={item.status} className="flex items-center gap-2">
-          <ComplianceCell status={item.status} size="sm" />
-          <span>{item.label}</span>
-        </li>
-      ))}
-    </ul>
+    <div className="rounded-lg border border-neutral-200 bg-neutral-50 px-4 py-3">
+      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-400">
+        Leyenda
+      </p>
+      <ul className="grid grid-cols-2 gap-x-6 gap-y-2 text-xs text-neutral-600 sm:grid-cols-3 lg:grid-cols-4">
+        {COMPLIANCE_LEGEND.map((item) => (
+          <li key={item.status} className="flex items-center gap-2">
+            <LegendSwatch status={item.status} />
+            <span>{item.label}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
+}
+
+function LegendSwatch({ status }: { status: CellStatus }) {
+  if (status === "not_required") {
+    return (
+      <span className="inline-block h-3 w-3 shrink-0 rounded-full border border-dashed border-neutral-300 bg-neutral-100" />
+    );
+  }
+  return <ComplianceCell status={status} size="sm" />;
 }
