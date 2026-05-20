@@ -85,6 +85,44 @@ Para que el usuario sepa de un vistazo cuántos archivos tiene registrados en un
 
 ---
 
+### User Story 5 - Verificar documentos directamente desde el visualizador (Priority: P1)
+
+El administrador o supervisor está revisando los documentos de un período en el visualizador y quiere marcar como verificado el archivo que acaba de revisar. En lugar de tener que cerrar el visualizador y buscar otra ruta, puede hacerlo directamente desde el panel haciendo clic en el botón "Verificar" que aparece junto al botón "Descargar" del archivo actualmente seleccionado. Si el documento ya está verificado, el botón no aparece y se muestra en cambio un indicador de estado verificado. Los usuarios con rol visor no ven este botón.
+
+**Why this priority**: La verificación de documentos es la acción central del flujo de revisión REPSE. Si el supervisor tiene que salir del visualizador para verificar, pierde el contexto de la revisión y duplica los pasos. Concentrar la acción en el mismo panel donde se visualiza el documento acelera el proceso de validación y reduce errores de omisión.
+
+**Independent Test**: Se puede testear abriendo el visualizador con un usuario con rol administrador, seleccionando un documento no verificado, verificando que el botón "Verificar" aparece junto al botón "Descargar", haciendo clic en él y confirmando que el indicador del documento cambia a "Verificado" y que la esfera de la cuadrícula refleja el estado actualizado al cerrar el visualizador. Repetir con un usuario con rol visor y confirmar que el botón no aparece.
+
+**Acceptance Scenarios**:
+
+1. **Given** el visualizador está abierto y el usuario tiene rol administrador o supervisor, **When** el documento seleccionado NO está verificado, **Then** aparece el botón "Verificar" junto al botón "Descargar" para ese documento.
+2. **Given** el botón "Verificar" está visible, **When** el usuario hace clic en él, **Then** el sistema registra la verificación, el indicador del archivo en la lista cambia a "Verificado" y el botón "Verificar" desaparece para ese documento, todo sin cerrar el visualizador.
+3. **Given** un documento ya verificado está seleccionado, **When** el usuario lo ve en el visualizador, **Then** el botón "Verificar" NO aparece y el documento muestra un indicador claro de estado verificado.
+4. **Given** el visualizador está abierto y el usuario tiene rol visor, **When** revisa los documentos, **Then** el botón "Verificar" NO aparece para ningún documento; el visualizador opera en modo solo lectura y descarga.
+5. **Given** el usuario hizo clic en "Verificar" y la operación falla por error de red o de servidor, **When** termina el intento, **Then** el sistema muestra un mensaje de error al usuario y el documento conserva su estado anterior; el usuario puede reintentar.
+6. **Given** el visualizador tiene varios documentos listados para un período, **When** el usuario verifica el archivo seleccionado, **Then** solo ese archivo individual cambia a estado verificado; los demás documentos del período conservan su estado.
+
+---
+
+### User Story 6 - Validar el tipo de documento completo desde el visualizador (Priority: P1)
+
+El supervisor de cumplimiento está en el visualizador revisando todos los archivos asociados a un tipo de documento para un período. Después de revisar los documentos —que pueden ser uno o varios comprobantes— quiere marcar el tipo de documento completo como "Validado", cambiando el estado de la celda en la cuadrícula. Esta acción aplica al tipo de documento en su conjunto y no a un archivo individual, porque ciertos requisitos REPSE exigen varios comprobantes para considerarse cumplidos.
+
+**Why this priority**: La validación formal del cumplimiento es la acción de negocio central del sistema REPSE. Que el estado "Validado" corresponda al tipo de documento (no a un archivo individual) es correcto conceptualmente: un proveedor cumple con un requisito cuando entrega todos los comprobantes necesarios para ese tipo, no cuando sube un único archivo. Mantener esta distinción evita validaciones parciales que podrían registrar falso cumplimiento.
+
+**Independent Test**: Abrir el visualizador de una celda con estado no validado que tiene 2 archivos; verificar que aparece el botón "Marcar como Validado" en el área de información del tipo de documento (separado de los botones "Verificar" y "Descargar" de los archivos individuales); hacer clic en él y confirmar que el estado de la celda cambia a "Validado" en la cuadrícula. Repetir con una celda ya validada y verificar que el botón no aparece.
+
+**Acceptance Scenarios**:
+
+1. **Given** el visualizador está abierto para un tipo de documento con estado no validado y el usuario tiene rol administrador o supervisor, **When** el usuario ve la cabecera o área de información del visualizador, **Then** aparece el botón "Marcar como Validado" en un área claramente separada de los controles de archivo individual.
+2. **Given** el botón "Marcar como Validado" está visible, **When** el usuario hace clic en él, **Then** el sistema cambia el estado de la celda (tipo de documento / período) a "Validado", actualiza la esfera en la cuadrícula y oculta la opción de agregar documentos adicionales, todo sin cerrar el visualizador.
+3. **Given** un tipo de documento tiene estado "Validado", **When** el usuario abre el visualizador, **Then** el botón "Marcar como Validado" NO aparece y el visualizador muestra un indicador claro de que el tipo de documento está validado en el área de cabecera.
+4. **Given** el visualizador está abierto con rol visor, **When** el usuario revisa los documentos, **Then** el botón "Marcar como Validado" NO aparece; el visualizador funciona en modo solo lectura.
+5. **Given** el usuario hace clic en "Marcar como Validado" y la operación falla por error de red, **When** termina el intento, **Then** el sistema muestra un mensaje de error y el tipo de documento conserva su estado anterior; el usuario puede reintentar.
+6. **Given** un tipo de documento tiene múltiples archivos (p. ej. 3 comprobantes del IMSS), **When** el supervisor hace clic en "Marcar como Validado", **Then** el estado "Validado" se aplica al tipo de documento completo sin importar cuántos archivos lo componen ni cuál está seleccionado en ese momento en el visualizador.
+
+---
+
 ### Edge Cases
 
 - ¿Qué pasa si el usuario intenta subir un archivo de tipo no permitido (p. ej. `.exe`)? → El sistema rechaza el archivo antes de iniciar la transferencia y muestra un mensaje con los tipos permitidos.
@@ -94,7 +132,12 @@ Para que el usuario sepa de un vistazo cuántos archivos tiene registrados en un
 - ¿Qué pasa si el formato del archivo no admite vista previa en el navegador (p. ej. `.xlsx`, `.docx`)? → El panel muestra el nombre del archivo, su tamaño y solo el botón de descarga, sin área de previsualización; nunca se inicia una descarga automática.
 - ¿Qué pasa si hay decenas de archivos asociados a un período? → La lista del visualizador tiene scroll; no se pagina.
 - ¿Qué pasa si el usuario intenta agregar documentos a un período ya validado? → El botón de carga adicional no está disponible; el visualizador muestra una nota indicando que el período está validado y no admite cambios.
+- ¿Qué pasa si un tipo de documento no tiene ningún archivo subido y el supervisor intenta validarlo? → El botón "Marcar como Validado" no aparece; el estado validado solo puede asignarse a un tipo de documento que tenga al menos un archivo registrado.
+- ¿Qué pasa si algunos archivos de un tipo de documento están verificados individualmente y otros no, y el supervisor quiere validar el tipo? → El supervisor puede marcar el tipo de documento como "Validado" en cualquier momento (con al menos un archivo presente); la validación del tipo es independiente del estado de verificación individual de cada archivo. Ambos estados coexisten sin bloqueo mutuo.
+- ¿Qué pasa si un usuario visor intenta cambiar el estado de validación del tipo accediendo directamente a la API? → El sistema rechaza la operación con un error de autorización; la validación del tipo solo es posible para administradores y supervisores.
 - ¿Qué pasa si el PDF es muy extenso (más de 100 páginas)? → El navegador renderiza el PDF completo con scroll propio; el sistema no limita la longitud del documento.
+- ¿Qué pasa si la verificación falla por error de servidor? → El documento conserva su estado anterior; se muestra un mensaje de error junto al botón y el usuario puede reintentar sin cerrar el visualizador.
+- ¿Qué pasa si un usuario visor intenta verificar accediendo directamente a la API? → El sistema rechaza la operación con un error de autorización; la verificación solo es posible para administradores y supervisores.
 
 ## Requirements *(mandatory)*
 
@@ -115,13 +158,24 @@ Para que el usuario sepa de un vistazo cuántos archivos tiene registrados en un
 - **FR-013**: Cuando el visualizador está abierto para una celda con estado no validado, DEBE mostrar una opción para agregar documentos adicionales al período sin necesidad de cerrar el visualizador.
 - **FR-014**: La opción de agregar documentos adicionales (FR-013) DEBE estar oculta o deshabilitada cuando la celda tiene estado validado; en ese estado el visualizador opera en modo solo lectura y descarga.
 - **FR-015**: Al agregar documentos adicionales desde el visualizador, el sistema DEBE subirlos siguiendo las mismas reglas de validación de tipo y tamaño que FR-011, y mostrarlos en la lista del visualizador al terminar sin cerrar el panel.
+- **FR-016**: En el visualizador, junto al botón "Descargar" del archivo actualmente seleccionado, el sistema DEBE mostrar un botón "Verificar" para usuarios con rol administrador o supervisor cuando el documento seleccionado aún no ha sido verificado.
+- **FR-017**: El botón "Verificar" (FR-016) DEBE estar ausente para documentos que ya tienen estado verificado; en su lugar, el archivo DEBE mostrar un indicador visual claro de estado verificado en la lista lateral del visualizador.
+- **FR-018**: Al hacer clic en "Verificar", el sistema DEBE registrar la verificación del documento, actualizar inmediatamente el indicador del archivo en la lista lateral y ocultar el botón "Verificar" para ese documento, todo sin cerrar ni recargar el visualizador.
+- **FR-019**: El botón "Verificar" DEBE estar completamente oculto para usuarios con rol visor; el visualizador funciona en modo solo lectura y descarga para ese rol, independientemente del estado de verificación de los documentos.
+- **FR-020**: El visualizador DEBE mostrar un botón "Marcar como Validado" para el tipo de documento en el área de cabecera o de información del panel, visible únicamente cuando el usuario tiene rol administrador o supervisor, el tipo de documento tiene al menos un archivo registrado y su estado aún no es "Validado". Este botón DEBE ubicarse en un área visualmente separada de los controles de archivo individual ("Verificar" y "Descargar") para dejar claro que la acción aplica al tipo de documento en su conjunto.
+- **FR-021**: Al hacer clic en "Marcar como Validado", el sistema DEBE cambiar el estado de la celda (tipo de documento / período) a "Validado". El cambio aplica al tipo de documento completo, independientemente del número de archivos asociados y del archivo actualmente seleccionado en el visualizador. Al cerrar el visualizador, la cuadrícula DEBE reflejar el nuevo estado de la celda.
+- **FR-022**: Cuando el tipo de documento tiene estado "Validado", el visualizador DEBE mostrar un indicador de ese estado en la cabecera del panel, ocultar el botón "Marcar como Validado" y ocultar la opción de agregar documentos adicionales. El estado validado corresponde al tipo de documento en su conjunto; los archivos individuales pueden seguir mostrando su propio estado de verificación de forma separada.
+- **FR-023**: El botón "Marcar como Validado" DEBE estar completamente oculto para usuarios con rol visor, independientemente del estado de validación del tipo de documento.
 
 ### Key Entities
 
 - **Carga de documentos**: Operación que asocia uno o más archivos físicos a un proveedor, tipo de documento y período. Cada archivo es un ítem independiente con su propio estado de transferencia.
 - **Archivo de documento**: Un fichero individual subido como parte de una carga; tiene nombre, tipo MIME, tamaño y fecha de carga. Puede ser previsualizeable directamente en el navegador o solo descargable según su tipo MIME.
 - **Visualizador de documentos**: Componente de interfaz que abre el acervo de archivos de una celda específica; permite previsualización en línea, navegación y descarga explícita. En celdas no validadas también expone la opción de agregar documentos adicionales.
-- **Estado de validación**: Condición de una celda que indica si los documentos del período han sido revisados y aceptados por un supervisor. Determina si el visualizador muestra la opción de carga adicional.
+- **Estado de validación del tipo de documento**: Condición que pertenece al tipo de documento como conjunto para un período determinado, no a ningún archivo individual. Indica si el requisito REPSE representado por ese tipo de documento ha sido formalmente aceptado por un supervisor. Un tipo de documento puede tener uno o varios archivos; la validación aplica al tipo completo. Determina si el visualizador muestra la opción de carga adicional y el botón "Marcar como Validado".
+- **Estado de verificación de archivo**: Condición individual de un archivo específico dentro de un tipo de documento. Indica que el contenido de ese archivo concreto ha sido revisado y autenticado. Un tipo de documento puede contener archivos con distinto estado de verificación; este estado es independiente del estado de validación del tipo.
+- **Validación del tipo de documento**: Acción por la que un administrador o supervisor marca el tipo de documento completo como "Validado" para un período. Cambia el estado de la celda en la cuadrícula y aplica al tipo en su totalidad, independientemente de cuántos archivos lo componen.
+- **Verificación de archivo**: Acción por la que un administrador o supervisor confirma que el contenido de un archivo individual es correcto y auténtico. No cambia el estado de la celda; afecta únicamente al archivo seleccionado en el visualizador.
 
 ## Success Criteria *(mandatory)*
 
@@ -133,6 +187,8 @@ Para que el usuario sepa de un vistazo cuántos archivos tiene registrados en un
 - **SC-004**: La vista previa integrada carga y muestra archivos PDF e imágenes en menos de 3 segundos en condiciones normales de red interna, sin que el sistema inicie ninguna descarga en ningún momento del proceso.
 - **SC-005**: Tras una carga fallida parcial, el usuario puede identificar qué archivos fallaron y reintentarlos sin tener que volver a seleccionar los archivos exitosos.
 - **SC-006**: Un administrador puede agregar un documento adicional a un período no validado desde el visualizador en menos de 60 segundos, sin perder el contexto de revisión (el panel permanece abierto).
+- **SC-007**: Un administrador o supervisor puede revisar y verificar un documento individual desde el visualizador en menos de 15 segundos desde que abre el panel, sin necesidad de salir a otra pantalla.
+- **SC-008**: Un supervisor puede validar un tipo de documento completo —con uno o varios archivos— desde el visualizador en menos de 10 segundos, sin necesidad de validar archivo por archivo ni abandonar el contexto de revisión.
 
 ## Assumptions
 
@@ -144,3 +200,6 @@ Para que el usuario sepa de un vistazo cuántos archivos tiene registrados en un
 - No se contempla edición, anotación ni firma digital de documentos dentro del visualizador en esta versión; es exclusivamente de lectura, descarga y carga adicional.
 - Los archivos sin periodicidad mensual (documentos de entrega única de spec 006) también podrán visualizarse y recibir documentos adicionales (si no están validados) con el mismo componente.
 - El estado "no validado" incluye todos los estados previos a la validación formal por supervisor (p. ej. "pendiente", "en revisión"); el estado "validado" es el único que bloquea la carga adicional.
+- Las reglas de autorización para la acción de verificar (solo administradores y supervisores) y desverificar (solo administradores) ya están definidas en spec 001 y se aplican sin modificación en esta feature.
+- Existen dos niveles distintos de acción dentro del visualizador: la **verificación de archivo** (FR-016/FR-018) confirma la autenticidad de un archivo individual y no altera el estado de la celda; la **validación del tipo de documento** (FR-020/FR-021) cambia el estado de la celda completa y aplica al tipo en su conjunto, independientemente del número de archivos asociados. Ambas acciones pueden coexistir: un tipo puede estar validado aunque alguno de sus archivos individuales aún no esté verificado, o viceversa.
+- No se implementa la acción de "quitar verificación" (unverify) de archivo ni de "invalidar" (unvalidate) el tipo de documento desde el visualizador en esta versión; esas operaciones quedan fuera del alcance del feature.

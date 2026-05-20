@@ -1,9 +1,21 @@
 import { useEffect, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Download, X, RefreshCcw, FileText } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, X, RefreshCcw, FileText, Plus, Loader2, CheckCircle, XCircle } from "lucide-react";
 
+import { ApiError } from "@/lib/api";
 import { documentsApi } from "@/lib/api/index";
 import { useDocumentsList } from "@/lib/api/documents";
 import { Button } from "@/components/ui";
+
+const ADD_ALLOWED_MIME_TYPES = new Set([
+  "application/pdf",
+  "image/png",
+  "image/jpeg",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+]);
+const ADD_MAX_FILE_BYTES = 20 * 1024 * 1024;
+
+type AddFileStatus = "idle" | "uploading" | "success" | "error";
+type AddFileItem = { file: File; status: AddFileStatus; error?: string };
 
 const PREVIEW_MIME_TYPES = new Set(["application/pdf", "image/png", "image/jpeg", "image/gif", "image/webp"]);
 
@@ -28,20 +40,26 @@ export type DocumentViewerParams = {
   documentTypeId: number;
   documentTypeName: string;
   coveragePeriodStart: string | null;
+  canAddDocuments?: boolean;
 };
 
-type TokenCache = Record<number, string>;
+type BlobUrlCache = Record<number, string>;
 
 export function DocumentViewerModal({
   supplierId,
   documentTypeId,
   documentTypeName,
   coveragePeriodStart,
+  canAddDocuments = false,
   onClose,
 }: DocumentViewerParams & { onClose: () => void }) {
   const [selectedIdx, setSelectedIdx] = useState(0);
-  const [tokenCache, setTokenCache] = useState<TokenCache>({});
-  const [loadingToken, setLoadingToken] = useState(false);
+  const [blobUrlCache, setBlobUrlCache] = useState<BlobUrlCache>({});
+  const [loadingPreview, setLoadingPreview] = useState(false);
+  const blobUrlsRef = useRef<BlobUrlCache>({});
+  const [addItems, setAddItems] = useState<AddFileItem[]>([]);
+  const addFileRef = useRef<HTMLInputElement>(null);
+  const addUploadingRef = useRef(false);
 
   const { data, isLoading, isError, refetch } = useDocumentsList({
     supplier_id: supplierId,
@@ -54,27 +72,39 @@ export function DocumentViewerModal({
   const docs = data?.items ?? [];
   const selectedDoc = docs[selectedIdx] ?? null;
 
-  // Fetch download token when selected document changes
+  // Revoke all blob URLs on unmount to avoid memory leaks
+  useEffect(() => {
+    return () => {
+      Object.values(blobUrlsRef.current).forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, []);
+
+  // Fetch file as blob when selected document changes (avoids X-Frame-Options / auth issues)
   useEffect(() => {
     if (!selectedDoc) return;
-    if (tokenCache[selectedDoc.id]) return;
+    if (blobUrlCache[selectedDoc.id]) return;
     if (!PREVIEW_MIME_TYPES.has(selectedDoc.file?.mime_type ?? "")) return;
 
     let cancelled = false;
-    setLoadingToken(true);
-    documentsApi
-      .downloadToken(selectedDoc.id)
-      .then(({ token }) => {
-        if (!cancelled) {
-          setTokenCache((prev) => ({ ...prev, [selectedDoc.id]: token }));
-        }
-      })
-      .catch(() => {
+    setLoadingPreview(true);
+
+    (async () => {
+      try {
+        const { token } = await documentsApi.downloadToken(selectedDoc.id);
+        if (cancelled) return;
+        const res = await fetch(`/api/v1/files/${token}`, { credentials: "include" });
+        if (cancelled || !res.ok) return;
+        const blob = await res.blob();
+        if (cancelled) return;
+        const url = URL.createObjectURL(blob);
+        blobUrlsRef.current[selectedDoc.id] = url;
+        setBlobUrlCache((prev) => ({ ...prev, [selectedDoc.id]: url }));
+      } catch {
         // preview unavailable; user can still download
-      })
-      .finally(() => {
-        if (!cancelled) setLoadingToken(false);
-      });
+      } finally {
+        if (!cancelled) setLoadingPreview(false);
+      }
+    })();
 
     return () => {
       cancelled = true;
@@ -111,7 +141,54 @@ export function DocumentViewerModal({
     }
   }
 
-  const previewToken = selectedDoc ? tokenCache[selectedDoc.id] : undefined;
+  async function handleAddFilesSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const selected = Array.from(e.target.files ?? []);
+    if (selected.length === 0) return;
+    e.target.value = "";
+    if (addUploadingRef.current) return;
+
+    const initialItems: AddFileItem[] = selected.map((file) => {
+      if (!ADD_ALLOWED_MIME_TYPES.has(file.type)) {
+        return { file, status: "error", error: `Tipo no permitido: ${file.type || "desconocido"}.` };
+      }
+      if (file.size > ADD_MAX_FILE_BYTES) {
+        return { file, status: "error", error: `El archivo supera el tamaño máximo (${ADD_MAX_FILE_BYTES / (1024 * 1024)} MB).` };
+      }
+      return { file, status: "idle" as const };
+    });
+    setAddItems(initialItems);
+
+    const toUpload = initialItems.filter((i) => i.status === "idle");
+    if (toUpload.length === 0) return;
+
+    addUploadingRef.current = true;
+    let anySuccess = false;
+
+    for (const item of toUpload) {
+      setAddItems((prev) => prev.map((i) => (i.file === item.file ? { ...i, status: "uploading" as const } : i)));
+      try {
+        await documentsApi.upload({
+          supplier_id: supplierId,
+          document_type_id: documentTypeId,
+          coverage_period_start: coveragePeriodStart ?? undefined,
+          file: item.file,
+        });
+        setAddItems((prev) => prev.map((i) => (i.file === item.file ? { ...i, status: "success" as const } : i)));
+        anySuccess = true;
+      } catch (e) {
+        const msg = e instanceof ApiError ? e.message : "Error al subir";
+        setAddItems((prev) => prev.map((i) => (i.file === item.file ? { ...i, status: "error" as const, error: msg } : i)));
+      }
+    }
+
+    addUploadingRef.current = false;
+    if (anySuccess) {
+      refetch();
+      setTimeout(() => setAddItems([]), 2000);
+    }
+  }
+
+  const previewBlobUrl = selectedDoc ? blobUrlCache[selectedDoc.id] : undefined;
   const canPreview = selectedDoc && PREVIEW_MIME_TYPES.has(selectedDoc.file?.mime_type ?? "");
   const isImage = selectedDoc && selectedDoc.file?.mime_type?.startsWith("image/");
 
@@ -213,6 +290,48 @@ export function DocumentViewerModal({
                   ))}
                 </ul>
               )}
+
+              {canAddDocuments && (
+                <>
+                  <hr className="border-neutral-100" />
+                  <div className="p-3">
+                    <input
+                      type="file"
+                      multiple
+                      accept="application/pdf,image/png,image/jpeg,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                      ref={addFileRef}
+                      className="hidden"
+                      onChange={handleAddFilesSelected}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => addFileRef.current?.click()}
+                      disabled={addUploadingRef.current}
+                      className="flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-brand-300 bg-brand-50 px-3 py-2 text-xs font-medium text-brand-700 hover:bg-brand-100 disabled:opacity-50"
+                    >
+                      <Plus size={13} />
+                      Agregar documento
+                    </button>
+                    {addItems.length > 0 && (
+                      <ul className="mt-2 divide-y divide-neutral-100 rounded-md border border-neutral-200 text-xs">
+                        {addItems.map((item, i) => (
+                          <li key={i} className="flex items-center gap-2 px-2 py-1.5">
+                            <AddItemIcon status={item.status} />
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate font-medium text-neutral-800">{item.file.name}</p>
+                              {item.error ? (
+                                <p className="text-status-expired">{item.error}</p>
+                              ) : (
+                                <p className="text-neutral-400">{formatBytes(item.file.size)}</p>
+                              )}
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                </>
+              )}
             </aside>
 
             {/* Preview area */}
@@ -256,18 +375,18 @@ export function DocumentViewerModal({
 
                   {/* Preview content */}
                   <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto p-4">
-                    {loadingToken && !previewToken ? (
+                    {loadingPreview && !previewBlobUrl ? (
                       <p className="text-sm text-neutral-400">Cargando vista previa…</p>
-                    ) : canPreview && previewToken ? (
+                    ) : canPreview && previewBlobUrl ? (
                       isImage ? (
                         <img
-                          src={`/api/v1/files/${previewToken}`}
+                          src={previewBlobUrl}
                           alt={selectedDoc.file?.name ?? "Documento"}
                           className="max-h-full max-w-full rounded object-contain shadow"
                         />
                       ) : (
                         <iframe
-                          src={`/api/v1/files/${previewToken}`}
+                          src={previewBlobUrl}
                           title={selectedDoc.file?.name ?? "Documento"}
                           className="h-full w-full rounded border border-neutral-200"
                           style={{ minHeight: "500px" }}
@@ -307,4 +426,17 @@ export function DocumentViewerModal({
       </div>
     </>
   );
+}
+
+function AddItemIcon({ status }: { status: AddFileStatus }) {
+  switch (status) {
+    case "uploading":
+      return <Loader2 size={14} className="shrink-0 animate-spin text-blue-500" />;
+    case "success":
+      return <CheckCircle size={14} className="shrink-0 text-green-500" />;
+    case "error":
+      return <XCircle size={14} className="shrink-0 text-status-expired" />;
+    default:
+      return <span className="h-3.5 w-3.5 shrink-0 rounded-full border border-neutral-300" />;
+  }
 }

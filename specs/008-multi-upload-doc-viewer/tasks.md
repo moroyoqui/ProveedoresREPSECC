@@ -152,12 +152,12 @@ No hay tareas en esta fase. Continúa en Phase 2.
 
 ### Implementación US2 Update
 
-- [ ] T019 [US2] Actualizar `backend/src/repse/documents/routes.py` en el endpoint `GET /api/v1/files/{token}` (líneas 150-176):
+- [x] T019 [US2] Actualizar `backend/src/repse/documents/routes.py` en el endpoint `GET /api/v1/files/{token}` (líneas 150-176):
   - Agregar query param `inline: bool = False` a la firma
   - Cuando `inline is True`, responder con `Content-Disposition: inline; filename="{doc.file_name_original}"` en lugar de `attachment; filename="..."`
   - El resto de la lógica (autenticación JWT, verificación del token, comprobación de tenant, lectura del archivo con `store.open`) permanece exactamente igual
 
-- [ ] T020 [US2] Actualizar `frontend/src/components/documents/DocumentViewerModal.tsx`:
+- [x] T020 [US2] Actualizar `frontend/src/components/documents/DocumentViewerModal.tsx`:
   - En el `useEffect` que obtiene el token y construye la URL de preview (líneas 58-82), cambiar la URL fuente del `<iframe>` y del `<img>` de `/api/v1/files/${previewToken}` a `/api/v1/files/${previewToken}?inline=1` (líneas 263 y 269)
   - En `handleDownload` (líneas 102-112), mantener la URL sin el parámetro `?inline=1` para que el navegador fuerce la descarga como archivo adjunto
   - No se requiere ningún otro cambio; el token es el mismo para ambos modos
@@ -176,13 +176,13 @@ No hay tareas en esta fase. Continúa en Phase 2.
 
 ### Implementación New US3
 
-- [ ] T021 [P] [US3] Agregar prop `canAddDocuments?: boolean` al tipo `DocumentViewerParams` en `frontend/src/components/documents/DocumentViewerModal.tsx` (líneas 26-31) y recibirla en la firma del componente (línea 35) con valor por defecto `false`
+- [x] T021 [P] [US3] Agregar prop `canAddDocuments?: boolean` al tipo `DocumentViewerParams` en `frontend/src/components/documents/DocumentViewerModal.tsx` (líneas 26-31) y recibirla en la firma del componente (línea 35) con valor por defecto `false`
 
-- [ ] T022 [P] [US3] Actualizar `frontend/src/components/suppliers/ComplianceGrid.tsx` en la sección que construye el estado `viewerCell` y renderiza `<DocumentViewerModal>`:
+- [x] T022 [P] [US3] Actualizar `frontend/src/components/suppliers/ComplianceGrid.tsx` en la sección que construye el estado `viewerCell` y renderiza `<DocumentViewerModal>`:
   - El tipo de `viewerCell` debe incluir el campo `cellVerified: boolean` (o `cellStatus: string`) tomado del `CellOut` de la celda seleccionada
   - Al renderizar `<DocumentViewerModal>`, pasar `canAddDocuments={!viewerCell.cellVerified}` (o equivalente basado en el status: `viewerCell.cellStatus !== "verified"`)
 
-- [ ] T023 [US3] Agregar sección "Agregar documento" al final del `<aside>` (panel lateral izquierdo, líneas 169-215) de `frontend/src/components/documents/DocumentViewerModal.tsx`, visible solo cuando `canAddDocuments === true`:
+- [x] T023 [US3] Agregar sección "Agregar documento" al final del `<aside>` (panel lateral izquierdo, líneas 169-215) de `frontend/src/components/documents/DocumentViewerModal.tsx`, visible solo cuando `canAddDocuments === true`:
   - `const addFileRef = useRef<HTMLInputElement>(null)`
   - `const [addItems, setAddItems] = useState<AddFileItem[]>([])` donde `AddFileItem = { file: File; status: "idle" | "uploading" | "success" | "error"; error?: string }`
   - Un `<input type="file" multiple ref={addFileRef} className="hidden" onChange={handleAddFilesSelected} />`
@@ -190,11 +190,11 @@ No hay tareas en esta fase. Continúa en Phase 2.
   - Un `<ul>` que muestra cada `addItem` con su estado (spinner, ✓, ✗ + mensaje) debajo del botón
   - Separador visual (`<hr>` o `border-t`) entre la lista de archivos existentes y la sección de carga adicional
 
-- [ ] T024 [US3] Implementar `handleAddFilesSelected` y `handleAddUpload` en `frontend/src/components/documents/DocumentViewerModal.tsx`:
+- [x] T024 [US3] Implementar `handleAddFilesSelected` y `handleAddUpload` en `frontend/src/components/documents/DocumentViewerModal.tsx`:
   - `handleAddFilesSelected(e)`: leer `e.target.files`, construir el array `AddFileItem[]` con todos en `"idle"` y actualizar `addItems`; limpiar el input para permitir volver a seleccionar el mismo archivo
   - `handleAddUpload()`: disparado vía `useEffect` cuando `addItems` cambia y alguno está en `"idle"`; iterar secuencialmente, cambiar estado a `"uploading"`, llamar `documentsApi.upload(supplierId, documentTypeId, coveragePeriodStart, item.file)` (ver T025), actualizar a `"success"` o `"error"` según resultado; al terminar la iteración, si al menos uno tuvo éxito llamar `refetch()` y limpiar `addItems` tras 2 s para que el usuario vea el feedback
 
-- [ ] T025 [US3] Verificar en `frontend/src/lib/api/documents.ts` si ya existe un método `documentsApi.upload(...)` que construya el `FormData` y llame `POST /api/v1/suppliers/{supplierId}/documents`:
+- [x] T025 [US3] Verificar en `frontend/src/lib/api/documents.ts` si ya existe un método `documentsApi.upload(...)` que construya el `FormData` y llame `POST /api/v1/suppliers/{supplierId}/documents`:
   - Si existe (por ejemplo, usado por `UploadDialog`), reutilizarlo directamente en T024 sin duplicarlo
   - Si no existe como método en `documentsApi`, agregar `upload(supplierId: number, documentTypeId: number, coveragePeriodStart: string | null, file: File): Promise<void>` que construya el `FormData` con los campos `document_type_id`, `coverage_period_start` y `file`, y llame `POST /api/v1/suppliers/{supplierId}/documents`
 
@@ -212,7 +212,80 @@ No hay tareas en esta fase. Continúa en Phase 2.
 
 - [x] T018 Verificar que el `DocumentViewerModal` recarga la lista de archivos cuando el estado de la query es `stale` (botón "Actualizar" o `refetch` manual) en `frontend/src/components/documents/DocumentViewerModal.tsx`, para el caso en que otro usuario suba un archivo al mismo período mientras el modal está abierto
 
-- [ ] T026 [P] Aplicar la misma validación de tipo y tamaño (T016/T017) a los archivos seleccionados en la sección "Agregar documento" del `DocumentViewerModal`: en `handleAddFilesSelected`, marcar inmediatamente como `"error"` los archivos que no cumplan tipo/tamaño antes de iniciar cualquier upload
+- [x] T026 [P] Aplicar la misma validación de tipo y tamaño (T016/T017) a los archivos seleccionados en la sección "Agregar documento" del `DocumentViewerModal`: en `handleAddFilesSelected`, marcar inmediatamente como `"error"` los archivos que no cumplan tipo/tamaño antes de iniciar cualquier upload
+
+---
+
+## Phase 8: User Story 6 — Validar el tipo de documento desde el visualizador (Priority: P1)
+
+**Goal**: El supervisor puede marcar un tipo de documento completo como "Validado" desde el visualizador haciendo clic en "Marcar como Validado". La acción aplica al tipo de documento (celda) en su conjunto — no a archivos individuales — y persiste en una nueva tabla `compliance_cell_validations`. La celda cambia a `VALIDATED` en la cuadrícula al cerrar el modal.
+
+**⚠️ CAMBIO DE COMPORTAMIENTO**: La lógica de `cell_status()` cambia. Actualmente `doc.verified == True` produce `CellStatus.VALIDATED`. Con este cambio, `VALIDATED` solo se obtiene mediante validación explícita del tipo (T030); un documento con `verified=True` pero sin validación de tipo muestra `SUBMITTED`. La verificación individual de archivos (FR-016/FR-018) sigue existiendo pero no transiciona el estado de la celda.
+
+**Independent Test**: Abrir el visualizador de una celda con estado SUBMITTED (documentos subidos, tipo no validado); verificar que aparece el botón "Marcar como Validado" en el área de cabecera; hacer clic en él y confirmar que al cerrar el modal la celda muestra VALIDATED. Repetir con usuario visor y confirmar que el botón no aparece.
+
+### Backend: Modelo y migración
+
+- [ ] T027 [US6] Crear modelo SQLAlchemy `ComplianceCellValidation` en nuevo archivo `backend/src/repse/compliance/models.py`:
+  - Tabla: `compliance_cell_validations`
+  - Campos: `id` (BigInteger PK autoincrement), `organization_id` (BigInteger NOT NULL), `supplier_id` (FK→suppliers CASCADE), `document_type_id` (FK→document_types RESTRICT), `coverage_period_start` (Date nullable), `validated_by` (FK→users SET NULL), `validated_at` (DateTime not null), y `TimestampMixin`
+  - `UniqueConstraint("organization_id", "supplier_id", "document_type_id", "coverage_period_start", name="uq_cell_validation")`
+  - Importar la nueva clase en `backend/src/repse/compliance/__init__.py` y en el `target_metadata` de `backend/alembic/env.py` para que Alembic la detecte en autogeneración
+
+- [ ] T028 [US6] Crear migración Alembic `backend/alembic/versions/0004_add_compliance_cell_validations.py`:
+  - `upgrade()`: `op.create_table("compliance_cell_validations", ...)` con todas las columnas del modelo T027, sus FK constraints y el `UniqueConstraint`
+  - `downgrade()`: `op.drop_table("compliance_cell_validations")`
+  - Encadenar con `down_revision = "0003_add_user_password"` (última migración existente)
+
+### Backend: Endpoint
+
+- [ ] T029 [US6] Agregar endpoint `POST /suppliers/{supplier_id}/compliance/validate` en `backend/src/repse/compliance/routes.py`:
+  - Agregar schema `class ValidateCellIn(BaseModel): document_type_id: int; coverage_period_start: date | None = None` en el mismo archivo
+  - Required role: `ADMIN` o `MANAGER` (`require_role(Role.ADMIN.value, Role.MANAGER.value)`)
+  - Lógica: (1) verificar que el proveedor pertenece al tenant; (2) buscar registro existente en `ComplianceCellValidation` con la combinación `(organization_id, supplier_id, document_type_id, coverage_period_start)`; (3) si existe actualizarlo (`validated_by`, `validated_at`), si no crearlo; (4) `db.commit()`
+  - Response: `{"status": "validated", "validated_at": <iso_timestamp>}`
+
+### Backend: Servicio y schema
+
+- [ ] T030 [US6] Actualizar `backend/src/repse/compliance/service.py`:
+  - Importar `ComplianceCellValidation` desde `repse.compliance.models`
+  - En `get_annual_compliance()` (línea ~106), agregar una tercera query después de las dos existentes (docs y count_rows) que cargue todos los registros de `ComplianceCellValidation` del proveedor y año en un dict `validated_cells: set[tuple[int, int | None]]` con clave `(document_type_id, coverage_period_start_month)`
+  - En el bucle de celdas mensuales (líneas ~219-242), pasar `type_validated=(dt.id, month) in validated_cells` al construir cada `CellOut`
+  - Actualizar `cell_status()` (líneas 58-99): eliminar la línea `return CellStatus.VALIDATED if doc.verified else CellStatus.SUBMITTED`; reemplazar por `return CellStatus.SUBMITTED` cuando hay doc (VALIDATED ahora proviene del campo `type_validated` de `CellOut`, no de `cell_status()`); mantener toda la lógica de fechas para celdas sin doc
+  - Nota: `CellOut.status` se asigna DESPUÉS de `cell_status()` — añadir override: si `type_validated` es True, forzar `status=CellStatus.VALIDATED` al construir `CellOut`
+
+- [ ] T031 [P] [US6] Agregar campo `type_validated: bool = False` a la clase `CellOut` en `backend/src/repse/compliance/schemas.py` (después del campo `document_count`)
+
+### Frontend: API
+
+- [ ] T032 [P] [US6] Agregar función de mutación en `frontend/src/lib/api/documents.ts`:
+  - `export async function validateDocumentType(supplierId: number, documentTypeId: number, coveragePeriodStart: string | null): Promise<void>`: llama `apiFetch<void>(\`/suppliers/${supplierId}/compliance/validate\`, { method: "POST", body: JSON.stringify({ document_type_id: documentTypeId, coverage_period_start: coveragePeriodStart }) })`
+  - Exportar como función directa (sin hook React Query; el componente gestiona el estado de carga localmente)
+
+### Frontend: DocumentViewerModal
+
+- [ ] T033 [US6] Actualizar `frontend/src/components/documents/DocumentViewerModal.tsx`:
+  - Agregar props `typeValidated: boolean` y `canValidateType: boolean` al tipo `DocumentViewerParams` (líneas 38-44)
+  - Agregar `import { validateDocumentType } from "@/lib/api/documents"` y el ícono `ShieldCheck` de lucide-react
+  - Agregar estado local `const [localTypeValidated, setLocalTypeValidated] = useState(typeValidated)` y `const [validating, setValidating] = useState(false)` y `const [validateError, setValidateError] = useState<string | null>(null)`
+  - Implementar `handleValidateType()`: (1) `setValidating(true)`, (2) llamar `validateDocumentType(supplierId, documentTypeId, coveragePeriodStart)`, (3) si exitoso: `setLocalTypeValidated(true)`, (4) si error: `setValidateError("No se pudo validar. Intenta de nuevo.")`, (5) `setValidating(false)`
+  - En el panel lateral izquierdo (`<aside>`), encima de la lista de archivos, añadir bloque de estado del tipo:
+    - Si `localTypeValidated`: badge verde con ícono `ShieldCheck` + texto "Tipo de documento validado"
+    - Si `!localTypeValidated && canValidateType`: botón primario "Marcar como Validado" con spinner mientras `validating`; debajo del botón mostrar `validateError` si no es null
+    - Separador visual (`<hr>`) entre el bloque del tipo y la lista de archivos
+  - Actualizar la sección "Agregar documento": renderizar solo cuando `canAddDocuments && !localTypeValidated`
+
+### Frontend: ComplianceGrid
+
+- [ ] T034 [P] [US6] Actualizar `frontend/src/components/suppliers/ComplianceGrid.tsx`:
+  - Agregar campo `typeValidated: boolean` al tipo `ViewerState` (línea 10-13)
+  - Al hacer clic en una esfera con documentos para abrir el visualizador, extraer `cell.type_validated` del `CellOut` correspondiente y asignarlo a `typeValidated` en el `ViewerState`
+  - Al renderizar `<DocumentViewerModal>`:
+    - Pasar `typeValidated={viewerState.typeValidated}`
+    - Pasar `canValidateType={!viewerState.typeValidated && viewerState.cellStatus !== "not_required"}`
+    - Actualizar `canAddDocuments` para derivarlo de `!viewerState.typeValidated` (en lugar de basarse en el cellStatus "validated", ya que ahora `type_validated` es la fuente de verdad)
+
+**Checkpoint**: Clic en "Marcar como Validado" en el visualizador cambia la celda a VALIDATED en la cuadrícula. El botón está ausente para celdas ya validadas y para usuarios visor. La sección "Agregar documento" desaparece tras validar el tipo.
 
 ---
 
@@ -226,6 +299,7 @@ No hay tareas en esta fase. Continúa en Phase 2.
 - **Phase 5 (US3 conteo)**: Depende de Phase 4 completada (el campo `document_count` debe llegar al componente)
 - **Phase 6 (US2 Update)**: Depende de Phase 4 completada (el `DocumentViewerModal` debe existir); T019 y T020 pueden ejecutarse en paralelo entre sí
 - **Phase 7 (New US3)**: Depende de Phase 4 y Phase 6 completadas; T021 y T022 pueden ejecutarse en paralelo
+- **Phase 8 (US6)**: Depende de Phase 4 y Phase 6 completadas (el `DocumentViewerModal` debe existir con su estructura actual); T027, T028, T029 pueden iniciar en paralelo con T031 y T032
 - **Phase N (Polish)**: Depende de que las stories objetivo estén completas
 
 ### Dependencias dentro de cada historia
@@ -247,6 +321,12 @@ No hay tareas en esta fase. Continúa en Phase 2.
 - T021 [P] + T022 [P] → T023 → T024 → T025 (verificar/agregar método)
 - T026 puede hacerse en paralelo con T024
 
+**US6 (validación de tipo)**:
+- T027 → T028 → T029 (cadena backend: modelo → migración → endpoint)
+- T030 depende de T027 (necesita el modelo); T031 y T032 son paralelos entre sí y con T027/T031
+- T033 depende de T032 (necesita la función de API)
+- T034 depende de T031 (necesita `type_validated` en `CellOut`)
+
 ### Oportunidades de paralelismo
 
 ```
@@ -265,6 +345,11 @@ T020  # frontend: usar ?inline=1 en iframe/img
 # New US3 - ejecutar juntos al inicio:
 T021  # agregar prop canAddDocuments al modal
 T022  # pasar canAddDocuments desde ComplianceGrid
+
+# US6 - ejecutar juntos al inicio:
+T027  # modelo ComplianceCellValidation
+T031  # campo type_validated en CellOut
+T032  # función validateDocumentType en documents.ts
 ```
 
 ---
@@ -284,6 +369,12 @@ T022  # pasar canAddDocuments desde ComplianceGrid
 2. Phase 7 (T021-T025) → **demo: agregar documentos adicionales desde el visor**
 3. Phase N polish (T026) → validación en la sección de carga adicional
 
+### Nueva entrega: US6 — Validación de tipo de documento
+
+1. Phase 8 backend (T027-T031): modelo + migración + endpoint + service + schema → ejecutar T027+T031 en paralelo, luego T028 → T029 → T030
+2. Phase 8 frontend (T032-T034): T032 en paralelo con backend; T033 → T034 una vez T031 y T032 listos
+3. **⚠️ Validar el cambio de comportamiento de `cell_status()`** antes de deploy: celdas que hoy muestran VALIDATED por `doc.verified=True` mostrarán SUBMITTED hasta que el supervisor ejecute "Marcar como Validado"
+
 ---
 
 ## Notas
@@ -296,3 +387,6 @@ T022  # pasar canAddDocuments desde ComplianceGrid
 - Para US3 (conteo), el conteo en el backend suma todos los documentos no eliminados (`deleted_at IS NULL`), incluyendo versiones no-latest, para reflejar cuántos archivos existen realmente para esa celda
 - **Phase 6 fix**: El param `?inline=1` es pasado por el frontend al endpoint existente; no se crea un nuevo endpoint ni un segundo tipo de token. El token es el mismo para preview y descarga
 - **Phase 7**: La opción de agregar documentos es UI-only; el backend no valida si la celda está verificada al recibir el upload (comportamiento actual). Agregar validación backend queda fuera del scope de este spec
+- **Phase 8 - cambio de comportamiento crítico**: `cell_status()` ya no produce `VALIDATED` a partir de `doc.verified`; `VALIDATED` solo viene del registro en `compliance_cell_validations`. Documentos que hoy muestran la celda como VALIDATED (por `doc.verified=True`) pasarán a SUBMITTED hasta que se ejecute la acción de validación de tipo
+- **Phase 8 - migración de datos**: Si hay registros existentes con `doc.verified=True` que deben seguir mostrándose como VALIDATED, considerar un script de migración de datos que cree registros en `compliance_cell_validations` para esos casos antes del deploy
+- **Phase 8 - new endpoint prefix**: El endpoint de validación de tipo vive en `compliance/routes.py` bajo el path `/suppliers/{id}/compliance/validate`; se registra en el mismo router que ya sirve `GET /suppliers/{id}/compliance`

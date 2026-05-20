@@ -150,6 +150,7 @@ def issue_download_token(
 @router.get("/files/{token}", include_in_schema=False)
 def download_file(
     token: str,
+    inline: bool = False,
     user: CurrentUser = Depends(current_user),
     db: Session = Depends(get_db),
     store: FileStore = Depends(_file_store),
@@ -168,11 +169,12 @@ def download_file(
     if doc is None or doc.organization_id != user.organization_id:
         raise NotFound("Document not found")
 
+    disposition = "inline" if inline else "attachment"
     fh = store.open(doc.file_path)
     return StreamingResponse(
         fh,
         media_type=doc.file_mime_type,
-        headers={"Content-Disposition": f'attachment; filename="{doc.file_name_original}"'},
+        headers={"Content-Disposition": f'{disposition}; filename="{doc.file_name_original}"'},
     )
 
 

@@ -9,6 +9,7 @@ const MONTH_LABELS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "S
 
 type ViewerState = ViewerClickParams & {
   documentTypeName: string;
+  cellStatus: CellStatus;
 };
 
 type ComplianceGridProps = {
@@ -117,7 +118,7 @@ export function ComplianceGrid({ data, onUploadClick }: ComplianceGridProps) {
                                 : null
                             }
                             onViewerClick={(params) =>
-                              setViewerState({ ...params, documentTypeName: req.document_type.name })
+                              setViewerState({ ...params, documentTypeName: req.document_type.name, cellStatus: cell.status })
                             }
                             onUploadClick={onUploadClick}
                           />
@@ -154,7 +155,7 @@ export function ComplianceGrid({ data, onUploadClick }: ComplianceGridProps) {
                             : null
                         }
                         onViewerClick={(params) =>
-                          setViewerState({ ...params, documentTypeName: req.document_type.name })
+                          setViewerState({ ...params, documentTypeName: req.document_type.name, cellStatus: cell.status })
                         }
                         onUploadClick={onUploadClick}
                       />
@@ -175,6 +176,7 @@ export function ComplianceGrid({ data, onUploadClick }: ComplianceGridProps) {
           documentTypeId={viewerState.document_type_id}
           documentTypeName={viewerState.documentTypeName}
           coveragePeriodStart={viewerState.coverage_period_start}
+          canAddDocuments={viewerState.cellStatus !== "validated"}
           onClose={() => setViewerState(null)}
         />
       )}
