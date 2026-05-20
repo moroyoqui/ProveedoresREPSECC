@@ -68,17 +68,25 @@ Sube un documento contra un proveedor y tipo.
 
 ## GET `/api/v1/documents`
 
-Lista documentos del tenant con filtros.
+Lista documentos del tenant con filtros. Devuelve la vista global del tenant para la página `/documents`.
 
 - **Auth**: requerida. **Roles**: cualquiera.
 - **Query params**:
-  - `supplier_id` (opcional).
-  - `document_type_id` (opcional).
-  - `status` (opcional, multi-valor): `valid|expiring_soon|expired|missing`.
-  - `coverage_year` (opcional): filtra por año del `coverage_period_start`.
+  - `supplier_id` (opcional): filtrar por proveedor.
+  - `document_type_id` (opcional): filtrar por tipo de documento.
+  - `status` (opcional): `valid|expiring_soon|expired`.
+  - `verified` (opcional, `true|false`): filtrar por estado de verificación.
+  - `q` (opcional): búsqueda libre sobre `legal_name` del proveedor.
   - `is_latest` (default `true`).
-  - `cursor`, `limit` (default 20).
-- **Respuesta** `200`: lista paginada con la misma forma del item de POST.
+  - `limit` (default 20), `cursor` (paginación cursor).
+- **Respuesta** `200`: lista paginada. Cada item extiende la forma del POST con un campo adicional:
+  ```json
+  {
+    "supplier": { "id": 12, "legal_name": "Servicios Industriales del Norte" }
+  }
+  ```
+  El campo `supplier` siempre está presente en este endpoint (nunca `null`).
+- **Notas**: el filtro `q` hace `ILIKE %q%` sobre `suppliers.legal_name`. Multi-tenant: la query ya filtra por `organization_id` vía el tenant filter global.
 
 ## GET `/api/v1/documents/{document_id}`
 

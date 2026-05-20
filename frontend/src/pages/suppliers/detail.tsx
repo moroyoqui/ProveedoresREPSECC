@@ -3,15 +3,22 @@ import { Link, useParams } from "react-router-dom";
 import { useState } from "react";
 import { Pencil, Upload } from "lucide-react";
 
-import { suppliersApi } from "@/lib/api/index";
-import { Button, Card, CardBody, CardHeader, CardTitle, Table, TBody, TD, TH, THead, TR } from "@/components/ui";
-import { StatusBadge } from "@/components/documents/StatusBadge";
+import { documentsApi, suppliersApi } from "@/lib/api/index";
+import type { UploadClickParams } from "@/components/suppliers/ComplianceCell";
+import { Button, Card, CardBody, CardHeader, CardTitle } from "@/components/ui";
 import { UploadDialog } from "@/components/documents/UploadDialog";
+import { ComplianceGrid } from "@/components/suppliers/ComplianceGrid";
+import { OneTimeRequirements } from "@/components/suppliers/OneTimeRequirements";
 
 export function SupplierDetailPage() {
   const { id } = useParams<{ id: string }>();
   const supplierId = Number(id);
   const [showUpload, setShowUpload] = useState(false);
+  const [uploadPreset, setUploadPreset] = useState<{
+    document_type_id?: number | null;
+    coverage_period_start?: string | null;
+  }>({});
+  const year = new Date().getFullYear();
 
   const { data, isLoading } = useQuery({
     queryKey: ["supplier", supplierId],
@@ -19,11 +26,45 @@ export function SupplierDetailPage() {
     enabled: !Number.isNaN(supplierId),
   });
 
+  const compliance = useQuery({
+    queryKey: ["supplier-compliance", supplierId, year],
+    queryFn: () => suppliersApi.compliance(supplierId, year),
+    enabled: !Number.isNaN(supplierId),
+  });
+
+  async function handleDocumentClick(documentId: number) {
+    try {
+      const { token } = await documentsApi.downloadToken(documentId);
+      window.open(`/api/v1/files/${token}`, "_blank", "noopener,noreferrer");
+    } catch {
+      // si falla silenciosamente, el usuario puede reintentar desde el listado
+    }
+  }
+
+  function handleUploadClick(params: UploadClickParams) {
+    setUploadPreset(params);
+    setShowUpload(true);
+  }
+
+  function handleUploadClose(uploaded?: boolean) {
+    setShowUpload(false);
+    setUploadPreset({});
+    if (uploaded) {
+      // las queries se invalidan en UploadDialog; aquí solo limpiamos estado local
+    }
+  }
+
   if (isLoading) return <p className="p-8 text-sm text-neutral-500">Cargando…</p>;
   if (!data) return <p className="p-8 text-sm text-status-expired">No encontrado</p>;
 
+  const complianceData = compliance.data;
+  const bothEmpty =
+    complianceData &&
+    complianceData.monthly_requirements.length === 0 &&
+    complianceData.one_time_requirements.length === 0;
+
   return (
-    <div className="mx-auto max-w-5xl p-8">
+    <div className="mx-auto max-w-6xl p-8">
       <Link to="/suppliers" className="text-sm text-brand-500 hover:underline">
         ← Volver a proveedores
       </Link>
@@ -44,7 +85,7 @@ export function SupplierDetailPage() {
               Editar
             </Button>
           </Link>
-          <Button onClick={() => setShowUpload(true)}>
+          <Button onClick={() => { setUploadPreset({}); setShowUpload(true); }}>
             <Upload size={16} />
             Subir documento
           </Button>
@@ -61,7 +102,7 @@ export function SupplierDetailPage() {
               <p className="text-3xl font-semibold text-brand-700">{data.compliance_percent}%</p>
               <p className="text-xs uppercase tracking-wide text-neutral-500">global</p>
             </div>
-            <div className="grid grid-cols-4 gap-4 text-sm">
+            <div className="flex flex-1 justify-evenly text-sm">
               <Counter label="Vigentes" value={data.counts.valid} tone="text-status-valid" />
               <Counter label="Por vencer" value={data.counts.expiring_soon} tone="text-status-expiring" />
               <Counter label="Vencidos" value={data.counts.expired} tone="text-status-expired" />
@@ -71,38 +112,48 @@ export function SupplierDetailPage() {
         </CardBody>
       </Card>
 
-      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-neutral-500">
-        Documentos requeridos
-      </h2>
-      <Table>
-        <THead>
-          <TR>
-            <TH>Tipo</TH>
-            <TH>Periodo</TH>
-            <TH>Vencimiento</TH>
-            <TH>Estado</TH>
-            <TH>Verificado</TH>
-          </TR>
-        </THead>
-        <TBody>
-          {data.documents_by_type.map((row) => (
-            <TR key={row.document_type.id}>
-              <TD>{row.document_type.name}</TD>
-              <TD className="text-neutral-600">
-                {row.latest?.coverage_period_start ?? "—"}
-              </TD>
-              <TD>{row.latest?.due_date_effective ?? "—"}</TD>
-              <TD>
-                <StatusBadge status={row.latest?.status || row.status_override || "missing"} />
-              </TD>
-              <TD>{row.latest?.verified ? "✓" : "—"}</TD>
-            </TR>
-          ))}
-        </TBody>
-      </Table>
+      {compliance.isLoading ? (
+        <p className="mb-6 text-sm text-neutral-500">Cargando cuadrícula…</p>
+      ) : bothEmpty ? (
+        <div className="mb-6 rounded border border-dashed border-neutral-300 bg-neutral-50 p-8 text-center text-sm text-neutral-600">
+          Este proveedor no tiene requisitos de documentación configurados.{" "}
+          <Link to="/settings/catalogs/supplier-types" className="text-brand-500 hover:underline">
+            Configura el tipo de proveedor en Catálogos.
+          </Link>
+        </div>
+      ) : complianceData ? (
+        <>
+          <section className="mb-6">
+            <div className="mb-3 flex items-baseline justify-between">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
+                Cumplimiento {year}
+              </h2>
+            </div>
+            <ComplianceGrid
+              data={complianceData}
+              onUploadClick={handleUploadClick}
+            />
+          </section>
+
+          {complianceData.one_time_requirements.length > 0 && (
+            <OneTimeRequirements
+              items={complianceData.one_time_requirements}
+              onDocumentClick={handleDocumentClick}
+              onUploadClick={handleUploadClick}
+            />
+          )}
+        </>
+      ) : (
+        <p className="mb-6 text-sm text-status-expired">No se pudo cargar la cuadrícula.</p>
+      )}
 
       {showUpload && (
-        <UploadDialog supplierId={supplierId} onClose={() => setShowUpload(false)} />
+        <UploadDialog
+          supplierId={supplierId}
+          initialDocTypeId={uploadPreset.document_type_id}
+          initialCoverage={uploadPreset.coverage_period_start}
+          onClose={handleUploadClose}
+        />
       )}
     </div>
   );

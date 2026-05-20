@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -19,7 +20,10 @@ from repse.observability import metrics as metrics_mod
 from repse.observability.sentry import init_sentry
 
 # Domain routers (Phase 3).
+from repse.audit.routes import router as audit_router
 from repse.auth.routes import router as auth_router
+from repse.compliance.routes import router as compliance_router
+from repse.documents.jobs import schedule_daily_recalculation
 from repse.documents.routes import router as documents_router
 from repse.document_types.routes import router as document_types_router
 from repse.organizations.routes import router as organizations_router
@@ -37,7 +41,20 @@ async def lifespan(_app: FastAPI):  # type: ignore[no-untyped-def]
     configure_logging(level=settings.log_level)
     init_sentry(settings)
     init_db(settings)
-    yield
+    recalc_task: asyncio.Task[None] | None = None
+    if settings.documents_recalc_enabled:
+        recalc_task = asyncio.create_task(
+            schedule_daily_recalculation(hour_utc=settings.documents_recalc_hour_utc)
+        )
+    try:
+        yield
+    finally:
+        if recalc_task is not None:
+            recalc_task.cancel()
+            try:
+                await recalc_task
+            except (asyncio.CancelledError, Exception):  # pragma: no cover
+                pass
 
 
 _settings = get_settings()
@@ -96,5 +113,7 @@ app.include_router(supplier_type_requirements_router, prefix=f"{API_PREFIX}/supp
 app.include_router(document_types_router, prefix=f"{API_PREFIX}/document-types", tags=["document-types"])
 app.include_router(suppliers_router, prefix=f"{API_PREFIX}/suppliers", tags=["suppliers"])
 app.include_router(documents_router, prefix=f"{API_PREFIX}", tags=["documents"])
+app.include_router(compliance_router, prefix=f"{API_PREFIX}", tags=["compliance"])
+app.include_router(audit_router, prefix=f"{API_PREFIX}/audit-log", tags=["audit-log"])
 
 __all__ = ["app"]

@@ -10,6 +10,7 @@ from fastapi import UploadFile
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from repse.audit import actions as audit_actions
 from repse.audit.service import AuditEvent, write_event, write_system_event
 from repse.config import Settings
 from repse.documents.expiration import Periodicity as ExpPeriodicity, compute_due_date
@@ -192,7 +193,7 @@ def upload_document(
         AuditEvent(
             organization_id=organization_id,
             actor_user_id=actor_user_id,
-            action="document.uploaded",
+            action=audit_actions.DOCUMENT_UPLOADED,
             entity_type="document",
             entity_id=doc.id,
             metadata={
@@ -207,7 +208,7 @@ def upload_document(
         write_system_event(
             db,
             organization_id=organization_id,
-            action="document.ocr_completed",
+            action=audit_actions.DOCUMENT_OCR_COMPLETED,
             entity_type="document",
             entity_id=doc.id,
             metadata={
@@ -268,7 +269,7 @@ def verify_document(
         AuditEvent(
             organization_id=organization_id,
             actor_user_id=actor_user_id,
-            action="document.verified",
+            action=audit_actions.DOCUMENT_VERIFIED,
             entity_type="document",
             entity_id=doc.id,
             metadata={"note": note or ""},
@@ -299,7 +300,7 @@ def unverify_document(
         AuditEvent(
             organization_id=organization_id,
             actor_user_id=actor_user_id,
-            action="document.unverified",
+            action=audit_actions.DOCUMENT_UNVERIFIED,
             entity_type="document",
             entity_id=doc.id,
             metadata={},
@@ -308,3 +309,94 @@ def unverify_document(
     db.commit()
     db.refresh(doc)
     return doc
+
+
+def delete_document(
+    db: Session,
+    *,
+    document_id: int,
+    organization_id: int,
+    actor_user_id: int,
+    grace_hours: int,
+    settings: Settings,
+    reason: str | None = None,
+) -> None:
+    """Borra un documento dentro de la ventana de gracia (T098 spec 001).
+
+    Reglas:
+      * Sólo si ``now - created_at`` ≤ ``grace_hours``.
+      * Borra el archivo físico y deja la fila soft-deleted (``deleted_at``).
+      * Si la fila era ``is_latest`` y existe una versión previa para la misma
+        ``(supplier, type, period)``, la marca como ``is_latest=True`` para
+        mantener la invariante.
+      * Auditado como ``document.deleted``.
+    """
+    doc = db.get(Document, document_id)
+    if doc is None:
+        raise NotFound("Document not found")
+
+    now = datetime.now(timezone.utc)
+    # Cargado created_at es naive (DateTime sin TZ). Asumimos UTC en MySQL.
+    created_at_utc = doc.created_at
+    if created_at_utc.tzinfo is None:
+        created_at_utc = created_at_utc.replace(tzinfo=timezone.utc)
+    elapsed_seconds = (now - created_at_utc).total_seconds()
+    if elapsed_seconds > grace_hours * 3600:
+        raise Conflict(
+            "Delete window expired",
+            details={
+                "code": "delete_window_expired",
+                "grace_hours": grace_hours,
+            },
+        )
+
+    # Restaurar la versión previa como `latest` si aplica.
+    previous_latest_id: int | None = None
+    if doc.is_latest:
+        prev = db.execute(
+            select(Document)
+            .where(
+                Document.supplier_id == doc.supplier_id,
+                Document.document_type_id == doc.document_type_id,
+                Document.coverage_period_start == doc.coverage_period_start,
+                Document.is_latest.is_(False),
+                Document.id != doc.id,
+            )
+            .order_by(Document.version.desc())
+            .limit(1)
+        ).scalar_one_or_none()
+        if prev is not None:
+            prev.is_latest = True
+            previous_latest_id = prev.id
+
+    file_path = doc.file_path
+    doc.deleted_at = now
+    doc.is_latest = False
+
+    # Borra archivo físico (best-effort: si falla, el log de auditoría queda
+    # marcando que el registro se borró).
+    try:
+        from pathlib import Path
+
+        full = Path(settings.upload_root) / file_path
+        if full.exists():
+            full.unlink()
+    except Exception:  # pragma: no cover
+        pass
+
+    write_event(
+        db,
+        AuditEvent(
+            organization_id=organization_id,
+            actor_user_id=actor_user_id,
+            action=audit_actions.DOCUMENT_DELETED,
+            entity_type="document",
+            entity_id=doc.id,
+            metadata={
+                "reason": reason,
+                "file_path": file_path,
+                "promoted_previous_latest_id": previous_latest_id,
+            },
+        ),
+    )
+    db.commit()

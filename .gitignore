@@ -22,6 +22,7 @@ node_modules/
 frontend/dist/
 frontend/.vite/
 frontend/coverage/
+*.tsbuildinfo
 *.log
 npm-debug.log*
 pnpm-debug.log*
@@ -34,6 +35,7 @@ yarn-error.log*
 .env.*.local
 *.pem
 *.key
+ops/mysql-reset-root.sql
 
 # Local data / uploads / backups
 var/

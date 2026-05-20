@@ -5,6 +5,7 @@ from __future__ import annotations
 from enum import StrEnum
 from functools import lru_cache
 from pathlib import Path
+from urllib.parse import quote_plus
 
 from pydantic import Field, SecretStr, ValidationInfo, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -55,6 +56,13 @@ class Settings(BaseSettings):
     rate_limit_auth_per_min: int = Field(default=10, ge=1)
     rate_limit_uploads_per_min: int = Field(default=60, ge=1)
 
+    # Document deletion grace window (FR / contract spec 001).
+    document_delete_grace_hours: int = Field(default=24, ge=0)
+
+    # Background jobs
+    documents_recalc_enabled: bool = True
+    documents_recalc_hour_utc: int = Field(default=5, ge=0, le=23)  # ~23:00 CST
+
     @field_validator("app_secret")
     @classmethod
     def _validate_secret_length(cls, v: SecretStr, info: ValidationInfo) -> SecretStr:
@@ -64,8 +72,10 @@ class Settings(BaseSettings):
 
     @property
     def db_url(self) -> str:
+        user = quote_plus(self.db_user)
+        password = quote_plus(self.db_pass.get_secret_value())
         return (
-            f"mysql+pymysql://{self.db_user}:{self.db_pass.get_secret_value()}"
+            f"mysql+pymysql://{user}:{password}"
             f"@{self.db_host}:{self.db_port}/{self.db_name}?charset=utf8mb4"
         )
 

@@ -24,8 +24,14 @@ SUPPLIER_TYPE_CHANGED: Final = "supplier.type_changed"
 DOCUMENT_UPLOADED: Final = "document.uploaded"
 DOCUMENT_VERIFIED: Final = "document.verified"
 DOCUMENT_UNVERIFIED: Final = "document.unverified"
+DOCUMENT_DELETED: Final = "document.deleted"
 DOCUMENT_OCR_COMPLETED: Final = "document.ocr_completed"
 DOCUMENT_DELETED_BY_SUPPLIER_TYPE_CHANGE: Final = "document.deleted_by_supplier_type_change"
+
+
+# --- System (no human actor) -------------------------------------------------
+
+DOCUMENTS_STATUS_RECALCULATED: Final = "documents.status_recalculated"
 
 
 KNOWN_ACTIONS: Final[frozenset[str]] = frozenset(
@@ -38,7 +44,9 @@ KNOWN_ACTIONS: Final[frozenset[str]] = frozenset(
         DOCUMENT_UPLOADED,
         DOCUMENT_VERIFIED,
         DOCUMENT_UNVERIFIED,
+        DOCUMENT_DELETED,
         DOCUMENT_OCR_COMPLETED,
         DOCUMENT_DELETED_BY_SUPPLIER_TYPE_CHANGE,
+        DOCUMENTS_STATUS_RECALCULATED,
     }
 )

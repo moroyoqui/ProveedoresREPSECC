@@ -14,7 +14,7 @@ type NavItem = {
 };
 
 const NAV: NavItem[] = [
-  { to: "/", label: "Tablero", icon: LayoutDashboard },
+  { to: "/dashboard", label: "Tablero", icon: LayoutDashboard },
   { to: "/suppliers", label: "Proveedores", icon: Building2 },
   { to: "/documents", label: "Documentos", icon: FileStack },
   { to: "/users", label: "Usuarios", icon: Users, adminOnly: true },
@@ -62,7 +62,10 @@ export function AppShell() {
         <nav className="flex-1 p-3">
           {NAV.filter((item) => !item.adminOnly || user?.role === "admin").map((item) => {
             const Icon = item.icon;
-            const active = location.pathname.startsWith(item.to) && item.to !== "/" || location.pathname === item.to;
+            const active =
+              item.to === "/"
+                ? location.pathname === "/"
+                : location.pathname.startsWith(item.to);
             return (
               <Link
                 key={item.to}

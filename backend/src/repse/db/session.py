@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from contextlib import contextmanager
 
 from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import Session, sessionmaker
@@ -55,3 +56,21 @@ def get_engine() -> Engine:
         init_db()
     assert _engine is not None
     return _engine
+
+
+@contextmanager
+def session_scope() -> Iterator[Session]:
+    """Context manager para código que vive fuera de un request HTTP.
+
+    Usado por jobs (cron) y scripts de ops. Cierra la sesión al salir; el caller
+    es responsable de hacer ``commit``/``rollback`` (en línea con el resto del
+    código de servicio).
+    """
+    if _SessionLocal is None:
+        init_db()
+    assert _SessionLocal is not None
+    db = _SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()

@@ -213,37 +213,62 @@ Monorepo: `backend/` (FastAPI + SQLAlchemy + Alembic), `frontend/` (Vite + React
 
 ### Tests obligatorios
 
-- [ ] T087 [P] [US2] Integration test: cálculo de estado (vigente/por_vencer/vencido) respeta `expiring_soon_threshold_days` por organización y dispara recálculo al cambiarlo (FR-013) en [backend/tests/integration/test_status_calculation.py](backend/tests/integration/test_status_calculation.py).
-- [ ] T088 [P] [US2] Integration test: "Faltante" se deriva de `SupplierType` requirements, no del catálogo global (FR-012b) en [backend/tests/integration/test_compliance_aggregate.py](backend/tests/integration/test_compliance_aggregate.py).
-- [ ] T089 [P] [US2] Contract test: `POST /documents/{id}/verify` registra `verified_by`, `verified_at`, `verified_note` y actualiza `last_updated_by/_at`; `POST /documents/{id}/unverify` invierte (auditado) en [backend/tests/contract/test_documents_verify_contract.py](backend/tests/contract/test_documents_verify_contract.py).
-- [ ] T090 [P] [US2] Contract test: `GET /documents/{id}/history` retorna timeline humano + sistema (acciones del sistema con `actor.type='system'`) en [backend/tests/contract/test_documents_history_contract.py](backend/tests/contract/test_documents_history_contract.py).
+- [X] T087 [P] [US2] Integration test: cálculo de estado (vigente/por_vencer/vencido) respeta `expiring_soon_threshold_days` por organización y dispara recálculo al cambiarlo (FR-013) en [backend/tests/integration/test_status_calculation.py](backend/tests/integration/test_status_calculation.py).
+- [X] T088 [P] [US2] Integration test: "Faltante" se deriva de `SupplierType` requirements, no del catálogo global (FR-012b) en [backend/tests/integration/test_compliance_aggregate.py](backend/tests/integration/test_compliance_aggregate.py).
+- [X] T089 [P] [US2] Contract test: `POST /documents/{id}/verify` registra `verified_by`, `verified_at`, `verified_note` y actualiza `last_updated_by/_at`; `POST /documents/{id}/unverify` invierte (auditado) en [backend/tests/contract/test_documents_verify_contract.py](backend/tests/contract/test_documents_verify_contract.py).
+- [X] T090 [P] [US2] Contract test: `GET /documents/{id}/history` retorna timeline humano + sistema (acciones del sistema con `actor.type='system'`) en [backend/tests/contract/test_documents_history_contract.py](backend/tests/contract/test_documents_history_contract.py).
 
 ### Servicios y cálculos
 
-- [ ] T091 [US2] Servicio `documents.status_calculator.compute_status(document, today, threshold_days)` con la regla del data-model (vigente/expiring_soon/expired) en [backend/src/repse/documents/status.py](backend/src/repse/documents/status.py).
-- [ ] T092 [US2] Servicio `documents.recalculator.recalc_for_organization(org_id)` que materializa `status` en todos los documentos del tenant; idempotente; usado por (a) cron diario, (b) cambio de threshold, (c) cambio de `supplier_type_id`, (d) edición de requirements en [backend/src/repse/documents/recalculator.py](backend/src/repse/documents/recalculator.py).
-- [ ] T093 [US2] Cron / scheduler diario que invoca `recalc_for_organization` para cada org activa (FastAPI BackgroundTask al startup + APScheduler simple) en [backend/src/repse/documents/jobs.py](backend/src/repse/documents/jobs.py).
-- [ ] T094 [US2] Servicio `suppliers.compliance.aggregate(supplier_id)` que devuelve `{percent, counts {valid, expiring_soon, expired, missing}}` derivando "missing" de `SupplierType.requirements` − Documents.is_latest=true por periodo en [backend/src/repse/suppliers/compliance.py](backend/src/repse/suppliers/compliance.py).
-- [ ] T095 [US2] Ajustar `SupplierDetailOut` (T054) para incluir el agregado y, para cada requirement faltante, una fila "Faltante" sintética con su tipo + periodo esperado.
+- [X] T091 [US2] Servicio `documents.status_calculator.compute_status(document, today, threshold_days)` con la regla del data-model (vigente/expiring_soon/expired) en [backend/src/repse/documents/status.py](backend/src/repse/documents/status.py).
+- [X] T092 [US2] Servicio `documents.recalculator.recalc_for_organization(org_id)` que materializa `status` en todos los documentos del tenant; idempotente; usado por (a) cron diario, (b) cambio de threshold, (c) cambio de `supplier_type_id`, (d) edición de requirements en [backend/src/repse/documents/recalculator.py](backend/src/repse/documents/recalculator.py).
+- [X] T093 [US2] Cron / scheduler diario que invoca `recalc_for_organization` para cada org activa (FastAPI BackgroundTask al startup + APScheduler simple) en [backend/src/repse/documents/jobs.py](backend/src/repse/documents/jobs.py).
+- [X] T094 [US2] Servicio `suppliers.compliance.aggregate(supplier_id)` que devuelve `{percent, counts {valid, expiring_soon, expired, missing}}` derivando "missing" de `SupplierType.requirements` − Documents.is_latest=true por periodo en [backend/src/repse/suppliers/compliance.py](backend/src/repse/suppliers/compliance.py).
+- [X] T095 [US2] Ajustar `SupplierDetailOut` (T054) para incluir el agregado y, para cada requirement faltante, una fila "Faltante" sintética con su tipo + periodo esperado.
 
 ### Verification & history endpoints
 
-- [ ] T096 [US2] Endpoint `POST /api/v1/documents/{id}/verify`: bumpea `verified*` + `last_updated_*`, registra audit log `document.verified` en [backend/src/repse/documents/routes.py](backend/src/repse/documents/routes.py).
-- [ ] T097 [US2] Endpoint `POST /api/v1/documents/{id}/unverify` (admin only) en [backend/src/repse/documents/routes.py](backend/src/repse/documents/routes.py).
-- [ ] T098 [US2] Endpoint `DELETE /api/v1/documents/{id}` con ventana de gracia configurable (default 24 h) (`409 delete_window_expired`) en [backend/src/repse/documents/routes.py](backend/src/repse/documents/routes.py).
-- [ ] T099 [US2] Endpoint `GET /api/v1/documents/{id}/history` que consulta `audit_log` filtrado por `entity_type='document'`, mapea acciones humanas/sistema al esquema del contrato en [backend/src/repse/documents/routes.py](backend/src/repse/documents/routes.py).
-- [ ] T100 [US2] Endpoint `GET /api/v1/audit-log` (lectura genérica para admin/manager) en [backend/src/repse/audit/routes.py](backend/src/repse/audit/routes.py).
+- [X] T096 [US2] Endpoint `POST /api/v1/documents/{id}/verify`: bumpea `verified*` + `last_updated_*`, registra audit log `document.verified` en [backend/src/repse/documents/routes.py](backend/src/repse/documents/routes.py).
+- [X] T097 [US2] Endpoint `POST /api/v1/documents/{id}/unverify` (admin only) en [backend/src/repse/documents/routes.py](backend/src/repse/documents/routes.py).
+- [X] T098 [US2] Endpoint `DELETE /api/v1/documents/{id}` con ventana de gracia configurable (default 24 h) (`409 delete_window_expired`) en [backend/src/repse/documents/routes.py](backend/src/repse/documents/routes.py).
+- [X] T099 [US2] Endpoint `GET /api/v1/documents/{id}/history` que consulta `audit_log` filtrado por `entity_type='document'`, mapea acciones humanas/sistema al esquema del contrato en [backend/src/repse/documents/routes.py](backend/src/repse/documents/routes.py).
+- [X] T100 [US2] Endpoint `GET /api/v1/audit-log` (lectura genérica para admin/manager) en [backend/src/repse/audit/routes.py](backend/src/repse/audit/routes.py).
 
 ### Frontend US2
 
-- [ ] T101 [P] [US2] Componente `<ComplianceBadge status>` con paleta de la constitución FR-016 (verde/ámbar/rojo/gris para estados) en [frontend/src/components/documents/ComplianceBadge.tsx](frontend/src/components/documents/ComplianceBadge.tsx).
-- [ ] T102 [P] [US2] Componente `<ComplianceSummary>` para el header del detalle de proveedor (porcentaje + barras de conteo) en [frontend/src/components/suppliers/ComplianceSummary.tsx](frontend/src/components/suppliers/ComplianceSummary.tsx).
-- [ ] T103 [P] [US2] Tab "Historial" en detalle del documento, consume `/documents/{id}/history` y renderiza acciones humanas vs sistema con etiquetas distintas en [frontend/src/components/documents/HistoryTab.tsx](frontend/src/components/documents/HistoryTab.tsx).
-- [ ] T104 [P] [US2] Botón "Marcar como verificado" + modal con campo `note` en el detalle del documento en [frontend/src/components/documents/VerifyDialog.tsx](frontend/src/components/documents/VerifyDialog.tsx).
-- [ ] T105 [P] [US2] Página "Tablero" minimal del tenant: 4 cards con totales (proveedores activos, % cumplimiento global, en riesgo, por vencer 30 d). Sin gráficos (eso es spec 005). En [frontend/src/pages/dashboard/index.tsx](frontend/src/pages/dashboard/index.tsx).
-- [ ] T106 [P] [US2] E2E Playwright US2: tenant con datos sembrados → abrir detalle de proveedor → ver estados correctos → marcar verificado → ver badge "Verificado" en [frontend/tests/e2e/us2_compliance_view.spec.ts](frontend/tests/e2e/us2_compliance_view.spec.ts).
+- [X] T101 [P] [US2] Componente `<ComplianceBadge status>` con paleta de la constitución FR-016 (verde/ámbar/rojo/gris para estados) en [frontend/src/components/documents/ComplianceBadge.tsx](frontend/src/components/documents/ComplianceBadge.tsx).
+- [X] T102 [P] [US2] Componente `<ComplianceSummary>` para el header del detalle de proveedor (porcentaje + barras de conteo) en [frontend/src/components/suppliers/ComplianceSummary.tsx](frontend/src/components/suppliers/ComplianceSummary.tsx).
+- [X] T103 [P] [US2] Tab "Historial" en detalle del documento, consume `/documents/{id}/history` y renderiza acciones humanas vs sistema con etiquetas distintas en [frontend/src/components/documents/HistoryTab.tsx](frontend/src/components/documents/HistoryTab.tsx).
+- [X] T104 [P] [US2] Botón "Marcar como verificado" + modal con campo `note` en el detalle del documento en [frontend/src/components/documents/VerifyDialog.tsx](frontend/src/components/documents/VerifyDialog.tsx).
+- [X] T105 [P] [US2] Página "Tablero" minimal del tenant: 4 cards con totales (proveedores activos, % cumplimiento global, en riesgo, por vencer 30 d). Sin gráficos (eso es spec 005). En [frontend/src/pages/dashboard/index.tsx](frontend/src/pages/dashboard/index.tsx).
+- [X] T106 [P] [US2] E2E Playwright US2: tenant con datos sembrados → abrir detalle de proveedor → ver estados correctos → marcar verificado → ver badge "Verificado" en [frontend/tests/e2e/us2_compliance_view.spec.ts](frontend/tests/e2e/us2_compliance_view.spec.ts).
 
-**Checkpoint**: US1 + US2 completas. Un usuario puede gestionar proveedores, cargar documentos, ver estado de cumplimiento por proveedor y por tenant, marcar verificación y consultar el historial completo de un documento.
+### Addendum US2: vista global "Documentos" en el menú (FR-012a desde `/documents`)
+
+> Hasta aquí FR-012a (marcar como verificado) vive solo en el detalle del documento dentro del proveedor (T104). Esta sección **expone la operación desde el ítem "Documentos" del menú lateral** ya cableado en [frontend/src/components/layout/AppShell.tsx:19](frontend/src/components/layout/AppShell.tsx), reemplazando el `<Placeholder title="Documentos" />` actual en [frontend/src/app/router.tsx:30](frontend/src/app/router.tsx) por una **lista global filtrable de todos los documentos del tenant** con la acción "Verificar" en cada fila. Reutiliza endpoint `GET /api/v1/documents` (T073) y `<VerifyDialog>` (T104).
+
+#### Tests obligatorios (rutas críticas: filtros + verificación desde lista global)
+
+- [X] T135 [P] [US2] Contract test: `GET /api/v1/documents` acepta filtros `verified=true|false`, `status`, `supplier_id`, `document_type_id`, `q` (búsqueda libre sobre nombre de proveedor + slug de tipo), paginación cursor; cada fila incluye `supplier: {id, legal_name}`; multi-tenant negativo (org A no ve documentos de org B, responde 200 con lista vacía) en [backend/tests/contract/test_documents_list_contract.py](backend/tests/contract/test_documents_list_contract.py).
+- [X] T136 [P] [US2] E2E Playwright: login → click "Documentos" en sidebar → ver lista global del tenant → filtrar por `verified=false` → desde una fila abrir `<VerifyDialog>` → escribir nota → confirmar → assert: `<VerifiedBadge>` cambia a "Verificado" sin recargar página y la fila desaparece del filtro `verified=false` en [frontend/tests/e2e/us2_documents_menu_verify.spec.ts](frontend/tests/e2e/us2_documents_menu_verify.spec.ts).
+
+#### Backend
+
+- [X] T137 [US2] Extender el endpoint `GET /api/v1/documents` (T073) en [backend/src/repse/documents/routes.py](backend/src/repse/documents/routes.py) para aceptar los filtros del T135 (`verified`, `status`, `supplier_id`, `document_type_id`, `q`) y enriquecer cada respuesta con el `supplier` mínimo (`id`, `legal_name`) que la nueva vista necesita para la columna "Proveedor".
+- [X] T138 [P] [US2] Actualizar `DocumentOut` para incluir el campo opcional `supplier: SupplierMiniOut | None` (poblado solo en endpoints de listado global, NULL cuando el proveedor ya está implícito en el path) en [backend/src/repse/documents/schemas.py](backend/src/repse/documents/schemas.py).
+- [X] T139 [P] [US2] Documentar los nuevos filtros y el campo `supplier` en el contrato de documentos en [specs/001-repse-compliance-tracker/contracts/documents.md](specs/001-repse-compliance-tracker/contracts/documents.md).
+
+#### Frontend
+
+- [X] T140 [P] [US2] Hook + query Tanstack `useDocumentsList(filters)` envolviendo `GET /api/v1/documents` con paginación cursor y `keepPreviousData` para transiciones suaves al cambiar filtros en [frontend/src/lib/api/documents.ts](frontend/src/lib/api/documents.ts).
+- [X] T141 [P] [US2] Componente `<DocumentFiltersBar>` con selects controlados (Proveedor, DocumentType, status, verified) y `<input q>` con debounce 300 ms; sincroniza estado con search params de la URL para que filtros sean compartibles vía link en [frontend/src/components/documents/DocumentFiltersBar.tsx](frontend/src/components/documents/DocumentFiltersBar.tsx).
+- [X] T142 [P] [US2] Componente `<VerifiedBadge document>` que renderiza "Verificado" / "Sin verificar" con tooltip de usuario + fecha cuando aplica (FR-011c), independiente del `<StatusBadge>` de vigencia en [frontend/src/components/documents/VerifiedBadge.tsx](frontend/src/components/documents/VerifiedBadge.tsx).
+- [X] T143 [US2] Página `/documents` que reemplaza `<Placeholder title="Documentos" />` en [frontend/src/app/router.tsx](frontend/src/app/router.tsx) (línea 30): renderiza `<DocumentFiltersBar>` + tabla con columnas (Proveedor, Tipo, Periodo, `<StatusBadge>`, `<VerifiedBadge>`, "Agregado", Acciones) consumiendo `useDocumentsList`; cada fila ofrece botón "Verificar" que abre `<VerifyDialog>` (T104), o "Quitar verificación" si admin y ya verificado, en [frontend/src/pages/documents/list.tsx](frontend/src/pages/documents/list.tsx).
+- [X] T144 [US2] Wire-up final: importar `DocumentsListPage` en [frontend/src/app/router.tsx](frontend/src/app/router.tsx), cambiar línea 30 a `<Route path="documents" element={<DocumentsListPage />} />`, y eliminar la función local `Placeholder` si queda huérfana (verificar que `/users` y `/settings` ya no la usan) en [frontend/src/app/router.tsx](frontend/src/app/router.tsx).
+
+**Checkpoint addendum**: el ítem "Documentos" del menú lateral abre una vista global del tenant con todos los documentos filtrables por proveedor/tipo/estado/verificado/búsqueda; cualquier fila puede marcarse "Verificado" reutilizando `<VerifyDialog>`, el `<VerifiedBadge>` se actualiza in-place sin recargar, y la paginación cursor mantiene scroll/posición.
+
+**Checkpoint**: US1 + US2 completas. Un usuario puede gestionar proveedores, cargar documentos, ver estado de cumplimiento por proveedor y por tenant, marcar verificación (tanto desde el detalle del documento como desde la vista global `/documents`) y consultar el historial completo de un documento.
 
 ---
 
@@ -294,13 +319,14 @@ Monorepo: `backend/` (FastAPI + SQLAlchemy + Alembic), `frontend/` (Vite + React
 - T091 (status_calculator) → T092 (recalculator) → T094 (aggregate) → T095 (detail enriched).
 - T096–T100 (endpoints) dependen de los servicios.
 - T101–T106 (frontend) dependen de los endpoints.
+- **Addendum vista global Documentos (T135–T144)**: T137 (extender `GET /documents`) depende de T073 (endpoint base) y T138 (schema `supplier`) puede ir paralelo. T143 (página) depende de T140 (hook), T141 (filters), T142 (badge) y T104 (`<VerifyDialog>`, existente en US2). T144 (wire-up router) depende de T143. T136 (E2E) depende de T143 + T144 + T137. T135 paralelo a todo el backend.
 
 ### Parallel Opportunities
 
 - Phase 1: T002–T006 todos paralelos (lenguajes/lints distintos).
 - Phase 2: T011/T012/T013/T018/T019/T020/T029/T030/T031/T032/T033 paralelos; modelos solo dependen de T014 + T015 + T016.
 - Phase 3: dentro de Tests, los T034–T039 todos paralelos. Models T040–T048 paralelos. Schemas T050–T055 paralelos. Frontend T077–T086 paralelos entre sí.
-- Phase 4: T087–T090 (tests) paralelos. Frontend T101–T106 paralelos.
+- Phase 4: T087–T090 (tests) paralelos. Frontend T101–T106 paralelos. Addendum: T135 + T136 paralelos entre sí y con backend; T138 + T139 paralelos a T137; T140 + T141 + T142 paralelos entre sí (archivos distintos).
 - Phase 5: la mayoría son paralelos.
 
 ---

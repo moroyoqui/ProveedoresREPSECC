@@ -3,14 +3,15 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query, Response
-from sqlalchemy import func, or_, select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from repse.auth.dependencies import CurrentUser, current_user, require_role
 from repse.db.session import get_db
 from repse.document_types.models import DocumentType
-from repse.documents.models import Document, DocumentStatus
+from repse.documents.models import Document
 from repse.errors import NotFound
+from repse.suppliers import compliance as compliance_service
 from repse.suppliers import service, type_change_service
 from repse.suppliers.models import Supplier, SupplierStatus
 from repse.suppliers.schemas import (
@@ -157,36 +158,14 @@ def reactivate_supplier_route(
 # ---------------------------------------------------------------------------
 
 def _counts_for(db: Session, supplier: Supplier) -> tuple[dict, int]:
-    """Returns ({valid, expiring_soon, expired, missing}, compliance_percent)."""
-    # Count docs latest by status.
-    rows = db.execute(
-        select(Document.status, func.count(Document.id))
-        .where(Document.supplier_id == supplier.id, Document.is_latest.is_(True))
-        .group_by(Document.status)
-    ).all()
-    counts = {"valid": 0, "expiring_soon": 0, "expired": 0, "missing": 0}
-    for st, c in rows:
-        counts[st.value if hasattr(st, "value") else st] = int(c)
+    """Returns ({valid, expiring_soon, expired, missing}, compliance_percent).
 
-    # Compute missing = active requirements for this supplier_type with no latest doc.
-    required_type_ids = db.execute(
-        select(SupplierTypeDocumentRequirement.document_type_id)
-        .where(
-            SupplierTypeDocumentRequirement.supplier_type_id == supplier.supplier_type_id,
-            SupplierTypeDocumentRequirement.status == RequirementStatus.ACTIVE,
-        )
-    ).scalars().all()
-    covered_type_ids = set(
-        db.execute(
-            select(Document.document_type_id)
-            .where(Document.supplier_id == supplier.id, Document.is_latest.is_(True))
-        ).scalars()
-    )
-    counts["missing"] = sum(1 for tid in required_type_ids if tid not in covered_type_ids)
-
-    total = sum(counts.values())
-    pct = 0 if total == 0 else round(counts["valid"] * 100 / total)
-    return counts, pct
+    Delegado a ``suppliers.compliance.aggregate`` (T094 spec 001) para que la
+    derivación de "missing" desde ``SupplierType.requirements`` (FR-012b) viva
+    en un único lugar.
+    """
+    agg = compliance_service.aggregate(db, supplier_id=supplier.id)
+    return dict(agg["counts"]), agg["percent"]
 
 
 def _serialize_list_item(db: Session, supplier: Supplier) -> SupplierListItem:
