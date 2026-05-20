@@ -66,6 +66,60 @@ def test_cell_status_validates_year_boundaries() -> None:
 
 
 # ---------------------------------------------------------------------------
+# cell_status — bimestral (due_month_offset=2)
+# ---------------------------------------------------------------------------
+
+
+def test_bimonthly_pending_in_due_month() -> None:
+    """Mar-Abr vence en mayo; si hoy es mayo debe ser PENDING."""
+    assert (
+        cell_status(None, month=3, year=2026, today=date(2026, 5, 19), due_month_offset=2)
+        == CellStatus.PENDING
+    )
+
+
+def test_bimonthly_pending_during_coverage_period() -> None:
+    """Mar-Abr vence en mayo; si hoy es marzo o abril también es PENDING."""
+    for day_month in (3, 4):
+        assert (
+            cell_status(None, month=3, year=2026, today=date(2026, day_month, 1), due_month_offset=2)
+            == CellStatus.PENDING
+        )
+
+
+def test_bimonthly_missing_after_due_month() -> None:
+    """Mar-Abr vence en mayo; si hoy es junio sin documento → MISSING."""
+    assert (
+        cell_status(None, month=3, year=2026, today=date(2026, 6, 1), due_month_offset=2)
+        == CellStatus.MISSING
+    )
+
+
+def test_bimonthly_future_before_coverage_start() -> None:
+    """Sep-Oct todavía no empieza si hoy es mayo → FUTURE."""
+    assert (
+        cell_status(None, month=9, year=2026, today=date(2026, 5, 19), due_month_offset=2)
+        == CellStatus.FUTURE
+    )
+
+
+def test_bimonthly_nov_dec_pending_in_january_next_year() -> None:
+    """Nov-Dic vence en enero del año siguiente; si hoy es enero → PENDING."""
+    assert (
+        cell_status(None, month=11, year=2026, today=date(2027, 1, 15), due_month_offset=2)
+        == CellStatus.PENDING
+    )
+
+
+def test_bimonthly_nov_dec_missing_after_january() -> None:
+    """Nov-Dic vence en enero del año siguiente; si hoy es febrero → MISSING."""
+    assert (
+        cell_status(None, month=11, year=2026, today=date(2027, 2, 1), due_month_offset=2)
+        == CellStatus.MISSING
+    )
+
+
+# ---------------------------------------------------------------------------
 # applicable_months — periodicidad
 # ---------------------------------------------------------------------------
 

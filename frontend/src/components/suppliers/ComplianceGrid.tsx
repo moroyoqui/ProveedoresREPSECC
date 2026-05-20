@@ -1,17 +1,23 @@
+import { useState } from "react";
 import type { ComplianceGrid as ComplianceGridData } from "@/lib/api/index";
 
-import { COMPLIANCE_LEGEND, ComplianceCell, type UploadClickParams } from "./ComplianceCell";
+import { COMPLIANCE_LEGEND, ComplianceCell, type UploadClickParams, type ViewerClickParams } from "./ComplianceCell";
+import { DocumentViewerModal } from "@/components/documents/DocumentViewerModal";
 import type { CellStatus } from "@/lib/api/index";
 
 const MONTH_LABELS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 
+type ViewerState = ViewerClickParams & {
+  documentTypeName: string;
+};
+
 type ComplianceGridProps = {
   data: ComplianceGridData;
-  onDocumentClick?: (documentId: number) => void;
   onUploadClick?: (params: UploadClickParams) => void;
 };
 
-export function ComplianceGrid({ data, onDocumentClick, onUploadClick }: ComplianceGridProps) {
+export function ComplianceGrid({ data, onUploadClick }: ComplianceGridProps) {
+  const [viewerState, setViewerState] = useState<ViewerState | null>(null);
   if (data.monthly_requirements.length === 0) {
     return (
       <div className="rounded border border-dashed border-neutral-300 bg-neutral-50 p-6 text-sm text-neutral-600">
@@ -57,43 +63,121 @@ export function ComplianceGrid({ data, onDocumentClick, onUploadClick }: Complia
             );
           })}
 
-          {data.monthly_requirements.map((req) => (
-            <div key={req.document_type.id} className="contents" role="row">
+          {data.monthly_requirements.map((req) => {
+            const isBimonthly = req.document_type.periodicity === "bimonthly";
+
+            const rowHeader = (
               <div
-                className="flex items-center border-t border-neutral-100 px-3 py-2 text-neutral-800"
+                className="flex items-start border-t border-neutral-100 px-3 py-2 text-neutral-800"
                 role="rowheader"
-                title={req.document_type.name}
               >
-                <span className="truncate">{req.document_type.name}</span>
+                <span className="break-words leading-snug">{req.document_type.name}</span>
               </div>
-              {req.cells.map((cell) => {
-                const isCurrent = currentMonth === cell.month;
-                return (
-                  <div
-                    key={`${req.document_type.id}-${cell.month}`}
-                    className={`flex items-center justify-center border-t border-neutral-100 py-2 ${
-                      isCurrent ? "bg-brand-50/40" : ""
-                    }`}
-                    role="cell"
-                  >
-                    <ComplianceCell
-                      status={cell.status}
-                      month={cell.month}
-                      document_id={cell.document_id}
-                      document_type_id={req.document_type.id}
-                      coverage_period_start={cell.coverage_period_start}
-                      onDocumentClick={onDocumentClick}
-                      onUploadClick={onUploadClick}
-                    />
-                  </div>
-                );
-              })}
-            </div>
-          ))}
+            );
+
+            if (isBimonthly) {
+              // Bimonthly: period starts on odd month S, due the following month
+              // (S+2). E.g. Jan-Feb period is due in March.
+              // Nov-Dec (S=11) would be due Jan next year → capped at col 12.
+              const dueColMap = new Map<number, (typeof req.cells)[number]>();
+              for (const cell of req.cells) {
+                if (cell.status === "not_required") continue;
+                const dueCol = ((cell.month + 1) % 12) + 1; // wraps 13→1 for Nov-Dec period
+                dueColMap.set(dueCol, cell);
+              }
+              return (
+                <div key={req.document_type.id} className="contents" role="row">
+                  {rowHeader}
+                  {Array.from({ length: 12 }, (_, i) => {
+                    const col = i + 1;
+                    const cell = dueColMap.get(col);
+                    const isCurrent =
+                      cell != null &&
+                      currentMonth != null &&
+                      currentMonth >= cell.month &&
+                      currentMonth <= cell.month + 2;
+                    return (
+                      <div
+                        key={`${req.document_type.id}-${col}`}
+                        className={`flex items-center justify-center border-t border-neutral-100 py-2 ${
+                          isCurrent ? "bg-brand-50/40" : ""
+                        }`}
+                        role="cell"
+                      >
+                        {cell && (
+                          <ComplianceCell
+                            status={cell.status}
+                            month={col}
+                            document_id={cell.document_id}
+                            document_count={cell.document_count}
+                            document_type_id={req.document_type.id}
+                            coverage_period_start={
+                              cell.coverage_period_start
+                                ? String(cell.coverage_period_start)
+                                : null
+                            }
+                            onViewerClick={(params) =>
+                              setViewerState({ ...params, documentTypeName: req.document_type.name })
+                            }
+                            onUploadClick={onUploadClick}
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            }
+
+            return (
+              <div key={req.document_type.id} className="contents" role="row">
+                {rowHeader}
+                {req.cells.map((cell) => {
+                  const isCurrent = currentMonth === cell.month;
+                  return (
+                    <div
+                      key={`${req.document_type.id}-${cell.month}`}
+                      className={`flex items-center justify-center border-t border-neutral-100 py-2 ${
+                        isCurrent ? "bg-brand-50/40" : ""
+                      }`}
+                      role="cell"
+                    >
+                      <ComplianceCell
+                        status={cell.status}
+                        month={cell.month}
+                        document_id={cell.document_id}
+                        document_count={cell.document_count}
+                        document_type_id={req.document_type.id}
+                        coverage_period_start={
+                          cell.coverage_period_start
+                            ? String(cell.coverage_period_start)
+                            : null
+                        }
+                        onViewerClick={(params) =>
+                          setViewerState({ ...params, documentTypeName: req.document_type.name })
+                        }
+                        onUploadClick={onUploadClick}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
         </div>
       </div>
 
       <ComplianceLegend />
+
+      {viewerState && (
+        <DocumentViewerModal
+          supplierId={data.supplier.id}
+          documentTypeId={viewerState.document_type_id}
+          documentTypeName={viewerState.documentTypeName}
+          coveragePeriodStart={viewerState.coverage_period_start}
+          onClose={() => setViewerState(null)}
+        />
+      )}
     </div>
   );
 }
@@ -117,10 +201,5 @@ function ComplianceLegend() {
 }
 
 function LegendSwatch({ status }: { status: CellStatus }) {
-  if (status === "not_required") {
-    return (
-      <span className="inline-block h-3 w-3 shrink-0 rounded-full border border-dashed border-neutral-300 bg-neutral-100" />
-    );
-  }
   return <ComplianceCell status={status} size="sm" />;
 }

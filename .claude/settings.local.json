@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Edit",
+      "Write",
+      "Bash(npm run *)",
+      "Bash(git *)",
+      "Bash(docker exec repse-dev-mysql-1 *)"
+    ],
+    "defaultMode": "acceptEdits"
+  }
+}

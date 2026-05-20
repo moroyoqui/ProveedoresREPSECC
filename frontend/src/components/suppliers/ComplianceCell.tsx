@@ -30,14 +30,21 @@ export type UploadClickParams = {
   coverage_period_start: string | null;
 };
 
+export type ViewerClickParams = {
+  document_type_id: number;
+  coverage_period_start: string | null;
+};
+
 export type ComplianceCellProps = {
   status: CellStatus;
   month?: number;
   size?: "sm" | "md";
   document_id?: number | null;
+  document_count?: number;
   document_type_id?: number;
   coverage_period_start?: string | null;
   onDocumentClick?: (documentId: number) => void;
+  onViewerClick?: (params: ViewerClickParams) => void;
   onUploadClick?: (params: UploadClickParams) => void;
 };
 
@@ -46,23 +53,28 @@ export function ComplianceCell({
   month,
   size = "md",
   document_id,
+  document_count,
   document_type_id,
   coverage_period_start,
   onDocumentClick,
+  onViewerClick,
   onUploadClick,
 }: ComplianceCellProps) {
+  const dotSize = size === "sm" ? "h-3 w-3" : "h-4 w-4";
+
   if (status === "not_required") {
     return (
       <span
-        className="block h-full w-full"
+        role="img"
         aria-label={month ? `${MONTH_NAMES[month - 1]}: no aplica` : "No aplica"}
+        title="No aplica"
+        className={`inline-block ${dotSize} shrink-0 rounded-full border border-dashed border-neutral-300 bg-neutral-100`}
       />
     );
   }
 
   const monthName = month ? MONTH_NAMES[month - 1] : null;
   const label = monthName ? `${monthName}: ${LABEL[status]}` : LABEL[status];
-  const dotSize = size === "sm" ? "h-3 w-3" : "h-4 w-4";
   const sphere = (
     <span
       role="img"
@@ -72,15 +84,52 @@ export function ComplianceCell({
     />
   );
 
+  const canOpenViewer =
+    (status === "validated" || status === "submitted" || status === "expired") &&
+    document_type_id != null &&
+    onViewerClick != null;
+
   const canOpenDoc =
     (status === "validated" || status === "submitted" || status === "expired") &&
     document_id != null &&
-    onDocumentClick != null;
+    onDocumentClick != null &&
+    !canOpenViewer;
 
   const canUpload =
     (status === "missing" || status === "pending") &&
     document_type_id != null &&
     onUploadClick != null;
+
+  const countLabel =
+    document_count != null && document_count > 1
+      ? ` (${document_count} archivos)`
+      : "";
+  const countBadge =
+    document_count != null && document_count > 1 ? (
+      <span
+        aria-hidden="true"
+        className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-brand-600 text-[9px] font-bold leading-none text-white"
+      >
+        {document_count > 9 ? "9+" : document_count}
+      </span>
+    ) : null;
+
+  if (canOpenViewer) {
+    return (
+      <button
+        type="button"
+        aria-label={`${label}${countLabel} — ver documentos`}
+        title={`${label}${countLabel} — ver documentos`}
+        className="relative cursor-pointer rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
+        onClick={() =>
+          onViewerClick!({ document_type_id: document_type_id!, coverage_period_start: coverage_period_start ?? null })
+        }
+      >
+        {sphere}
+        {countBadge}
+      </button>
+    );
+  }
 
   if (canOpenDoc) {
     return (
@@ -89,7 +138,7 @@ export function ComplianceCell({
         aria-label={label}
         title={label}
         className="cursor-pointer rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
-        onClick={() => onDocumentClick(document_id!)}
+        onClick={() => onDocumentClick!(document_id!)}
       >
         {sphere}
       </button>
@@ -104,7 +153,7 @@ export function ComplianceCell({
         title={`${label} — haz clic para subir`}
         className="cursor-pointer rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
         onClick={() =>
-          onUploadClick({ document_type_id: document_type_id!, coverage_period_start: coverage_period_start ?? null })
+          onUploadClick!({ document_type_id: document_type_id!, coverage_period_start: coverage_period_start ?? null })
         }
       >
         {sphere}

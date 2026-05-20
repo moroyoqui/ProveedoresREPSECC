@@ -56,6 +56,13 @@ class Settings(BaseSettings):
     rate_limit_auth_per_min: int = Field(default=10, ge=1)
     rate_limit_uploads_per_min: int = Field(default=60, ge=1)
 
+    # Document deletion grace window (FR / contract spec 001).
+    document_delete_grace_hours: int = Field(default=24, ge=0)
+
+    # Background jobs
+    documents_recalc_enabled: bool = True
+    documents_recalc_hour_utc: int = Field(default=5, ge=0, le=23)  # ~23:00 CST
+
     @field_validator("app_secret")
     @classmethod
     def _validate_secret_length(cls, v: SecretStr, info: ValidationInfo) -> SecretStr:

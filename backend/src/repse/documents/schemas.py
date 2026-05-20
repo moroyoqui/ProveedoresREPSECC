@@ -46,6 +46,12 @@ class DocumentAuditBlock(BaseModel):
     validated: VerifiedTrace | None = None
 
 
+class SupplierMiniOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    legal_name: str
+
+
 class DocumentOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -64,6 +70,7 @@ class DocumentOut(BaseModel):
     file: FileMeta
     ocr: OcrPayload
     audit: DocumentAuditBlock
+    supplier: SupplierMiniOut | None = None
 
 
 class DownloadTokenOut(BaseModel):

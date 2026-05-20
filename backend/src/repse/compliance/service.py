@@ -13,7 +13,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Any
 
-from sqlalchemy import extract, select
+from sqlalchemy import extract, func, select
 from sqlalchemy.orm import Session
 
 from repse.compliance.schemas import (
@@ -61,8 +61,15 @@ def cell_status(
     month: int,
     year: int,
     today: date,
+    due_month_offset: int = 0,
 ) -> CellStatus:
-    """Compute a single cell's status (see data-model.md §cell_status)."""
+    """Compute a single cell's status (see data-model.md §cell_status).
+
+    ``due_month_offset`` extends the pending window beyond the coverage start
+    month. For bimonthly documents the period starts on month S and is due on
+    S+2, so pass ``due_month_offset=2`` to keep the cell as PENDING until the
+    due month has passed.
+    """
     if doc is not None:
         doc_status = doc.status
         # Accept both StrEnum and plain str ("valid", "expired", …).
@@ -76,6 +83,17 @@ def cell_status(
     today_month_start = date(today.year, today.month, 1)
     if cell_start > today_month_start:
         return CellStatus.FUTURE
+
+    if due_month_offset > 0:
+        raw_due = month + due_month_offset
+        if raw_due <= 12:
+            due_month_start = date(year, raw_due, 1)
+        else:
+            due_month_start = date(year + 1, raw_due - 12, 1)
+        if today_month_start <= due_month_start:
+            return CellStatus.PENDING
+        return CellStatus.MISSING
+
     if cell_start == today_month_start:
         return CellStatus.PENDING
     return CellStatus.MISSING
@@ -137,6 +155,25 @@ def get_annual_compliance(
             key = (d.document_type_id, d.coverage_period_start.month)
             docs_by_type_and_month[key] = d
 
+    # Count all non-deleted documents (including non-latest) per (type, month)
+    count_rows = db.execute(
+        select(
+            Document.document_type_id,
+            extract("month", Document.coverage_period_start).label("m"),
+            func.count().label("cnt"),
+        )
+        .where(
+            Document.organization_id == organization_id,
+            Document.supplier_id == supplier_id,
+            Document.deleted_at.is_(None),
+            extract("year", Document.coverage_period_start) == year,
+        )
+        .group_by(Document.document_type_id, extract("month", Document.coverage_period_start))
+    ).all()
+    count_by_type_and_month: dict[tuple[int, int], int] = {
+        (int(r.document_type_id), int(r.m)): int(r.cnt) for r in count_rows
+    }
+
     # Also pick up one-time documents (periodicity 'none' can have NULL coverage
     # period). We need to fetch them in a separate query because the WHERE above
     # filters by extract("year", coverage_period_start) which excludes NULLs.
@@ -177,6 +214,7 @@ def get_annual_compliance(
             continue
 
         months = set(applicable_months(periodicity))
+        due_offset = 2 if periodicity == Periodicity.BIMONTHLY else 0
         cells: list[CellOut] = []
         for month in range(1, 13):
             if month not in months:
@@ -193,8 +231,12 @@ def get_annual_compliance(
             cells.append(
                 CellOut(
                     month=month,
-                    status=cell_status(doc, month=month, year=year, today=today),
+                    status=cell_status(
+                        doc, month=month, year=year, today=today,
+                        due_month_offset=due_offset,
+                    ),
                     document_id=doc.id if doc else None,
+                    document_count=count_by_type_and_month.get((dt.id, month), 0),
                     coverage_period_start=_coverage_start(month, year),
                 )
             )

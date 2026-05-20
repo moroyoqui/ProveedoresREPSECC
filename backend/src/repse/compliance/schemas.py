@@ -48,6 +48,7 @@ class CellOut(BaseModel):
     month: int
     status: CellStatus
     document_id: int | None = None
+    document_count: int = 0
     coverage_period_start: date | None = None
 
 

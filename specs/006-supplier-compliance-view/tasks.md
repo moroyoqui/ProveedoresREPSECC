@@ -78,8 +78,8 @@
 
 ### Implementación para US3
 
-- [ ] T012 [P] [US3] Crear componente `frontend/src/components/suppliers/OneTimeRequirements.tsx`: lista de tarjetas compactas, una por item de `one_time_requirements`; cada tarjeta muestra nombre del tipo, esfera de color (mismo `ComplianceCell` reutilizado), fecha de vencimiento si `due_date_effective` no es null, botón "Ver" si `document_id` no es null.
-- [ ] T013 [US3] Actualizar `frontend/src/pages/suppliers/detail.tsx`: renderizar `<OneTimeRequirements items={data.one_time_requirements} supplierId={supplierId} />` debajo del `ComplianceGrid`; solo mostrar la sección si `one_time_requirements.length > 0`.
+- [X] T012 [P] [US3] Crear componente `frontend/src/components/suppliers/OneTimeRequirements.tsx`: lista de tarjetas compactas, una por item de `one_time_requirements`; cada tarjeta muestra nombre del tipo, esfera de color (mismo `ComplianceCell` reutilizado), fecha de vencimiento si `due_date_effective` no es null, botón "Ver" si `document_id` no es null.
+- [X] T013 [US3] Actualizar `frontend/src/pages/suppliers/detail.tsx`: renderizar `<OneTimeRequirements items={data.one_time_requirements} supplierId={supplierId} />` debajo del `ComplianceGrid`; solo mostrar la sección si `one_time_requirements.length > 0`.
 
 **Checkpoint**: La pantalla de detalle muestra la cuadrícula mensual Y la sección de documentos de entrega única.
 
@@ -93,10 +93,10 @@
 
 ### Implementación para US4
 
-- [ ] T014 [US4] Actualizar `frontend/src/components/suppliers/ComplianceCell.tsx`: cuando `status` es `validated`, `submitted` o `expired` y `document_id != null`, envolver la esfera en un botón que dispara `onDocumentClick(document_id)` (prop callback).
-- [ ] T015 [US4] Actualizar `frontend/src/components/suppliers/ComplianceCell.tsx`: cuando `status` es `missing` o `pending`, envolver la esfera en un botón que dispara `onUploadClick({ document_type_id, coverage_period_start })` (prop callback).
-- [ ] T016 [US4] Actualizar `frontend/src/pages/suppliers/detail.tsx`: implementar `onDocumentClick` como navegación a `GET /api/v1/documents/{id}/download-token` (emitir token y abrir archivo, igual que el flujo ya existente); implementar `onUploadClick` como apertura de `UploadDialog` con los campos precargados.
-- [ ] T017 [P] [US4] Actualizar `frontend/src/components/suppliers/OneTimeRequirements.tsx`: el botón "Ver" de una tarjeta dispara el mismo `onDocumentClick`; si `document_id` es null, mostrar botón "Subir" que dispara `onUploadClick({ document_type_id, coverage_period_start: null })`.
+- [X] T014 [US4] Actualizar `frontend/src/components/suppliers/ComplianceCell.tsx`: cuando `status` es `validated`, `submitted` o `expired` y `document_id != null`, envolver la esfera en un botón que dispara `onDocumentClick(document_id)` (prop callback).
+- [X] T015 [US4] Actualizar `frontend/src/components/suppliers/ComplianceCell.tsx`: cuando `status` es `missing` o `pending`, envolver la esfera en un botón que dispara `onUploadClick({ document_type_id, coverage_period_start })` (prop callback).
+- [X] T016 [US4] Actualizar `frontend/src/pages/suppliers/detail.tsx`: implementar `onDocumentClick` como navegación a `GET /api/v1/documents/{id}/download-token` (emitir token y abrir archivo, igual que el flujo ya existente); implementar `onUploadClick` como apertura de `UploadDialog` con los campos precargados.
+- [X] T017 [P] [US4] Actualizar `frontend/src/components/suppliers/OneTimeRequirements.tsx`: el botón "Ver" de una tarjeta dispara el mismo `onDocumentClick`; si `document_id` es null, mostrar botón "Subir" que dispara `onUploadClick({ document_type_id, coverage_period_start: null })`.
 
 **Checkpoint**: La cuadrícula completa es accionable — clic en cualquier esfera ejecuta la acción contextual correcta.
 
@@ -106,9 +106,9 @@
 
 **Purpose**: Accesibilidad, estado vacío y validación final.
 
-- [ ] T018 [P] Agregar `aria-label` descriptivo a cada esfera en `ComplianceCell.tsx` (p. ej. `"Enero: validado"`, `"Marzo: faltante"`) para accesibilidad de lectores de pantalla.
-- [ ] T019 [P] Agregar estado vacío en `SupplierDetailPage` cuando `monthly_requirements` y `one_time_requirements` están ambos vacíos: mostrar mensaje "Este proveedor no tiene requisitos de documentación configurados. Configura el tipo de proveedor en Catálogos."
-- [ ] T020 Ejecutar validación del [quickstart.md](./quickstart.md): correr `pytest backend/tests/unit/test_compliance_service.py backend/tests/integration/test_compliance_routes.py -v` y confirmar que todos los tests pasan.
+- [X] T018 [P] Agregar `aria-label` descriptivo a cada esfera en `ComplianceCell.tsx` (p. ej. `"Enero: validado"`, `"Marzo: faltante"`) para accesibilidad de lectores de pantalla.
+- [X] T019 [P] Agregar estado vacío en `SupplierDetailPage` cuando `monthly_requirements` y `one_time_requirements` están ambos vacíos: mostrar mensaje "Este proveedor no tiene requisitos de documentación configurados. Configura el tipo de proveedor en Catálogos."
+- [X] T020 Ejecutar validación del [quickstart.md](./quickstart.md): correr `pytest backend/tests/unit/test_compliance_service.py backend/tests/integration/test_compliance_routes.py -v` y confirmar que todos los tests pasan. **Resultado**: 13/13 unit tests PASSED; integration tests requieren Docker socket desde el host (testcontainers), deben correrse fuera del contenedor.
 
 ---
 

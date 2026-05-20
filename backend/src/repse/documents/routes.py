@@ -70,6 +70,7 @@ def upload_document(
 def list_documents(
     supplier_id: int | None = None,
     document_type_id: int | None = None,
+    coverage_period_start: str | None = None,
     status: str | None = None,
     verified: bool | None = None,
     q: str | None = None,
@@ -83,6 +84,9 @@ def list_documents(
         stmt = stmt.where(Document.supplier_id == supplier_id)
     if document_type_id is not None:
         stmt = stmt.where(Document.document_type_id == document_type_id)
+    if coverage_period_start is not None:
+        coverage = date.fromisoformat(coverage_period_start)
+        stmt = stmt.where(Document.coverage_period_start == coverage)
     if is_latest:
         stmt = stmt.where(Document.is_latest.is_(True))
     if verified is not None:

@@ -127,7 +127,8 @@ export function DocumentsListPage() {
                 <TH>Estado</TH>
                 <TH>Verificación</TH>
                 <TH>Agregado</TH>
-                <TH className="text-right">Acciones</TH>
+                <TH className="text-center">Ver</TH>
+                <TH className="text-center">Verificar</TH>
               </TR>
             </THead>
             <TBody>
@@ -155,46 +156,49 @@ export function DocumentsListPage() {
                     {formatDate(doc.audit.added.at)}
                   </TD>
                   <TD
-                    className="text-right"
+                    className="text-center align-middle"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <div className="flex items-center justify-end gap-2">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedDocId(doc.id);
+                      }}
+                    >
+                      Ver
+                    </Button>
+                  </TD>
+                  <TD
+                    className="text-center align-middle"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {!doc.verified && (user?.role === "admin" || user?.role === "manager") && (
                       <Button
                         size="sm"
                         variant="ghost"
                         onClick={(e) => {
                           e.stopPropagation();
-                          setSelectedDocId(doc.id);
+                          setVerifyTarget(doc);
                         }}
                       >
-                        Ver
+                        Verificar
                       </Button>
-                      {!doc.verified && (user?.role === "admin" || user?.role === "manager") && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setVerifyTarget(doc);
-                          }}
-                        >
-                          Verificar
-                        </Button>
-                      )}
-                      {doc.verified && user?.role === "admin" && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          disabled={unverify.isPending}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            unverify.mutate(doc.id);
-                          }}
-                        >
-                          Quitar verificación
-                        </Button>
-                      )}
-                    </div>
+                    )}
+                    {doc.verified && user?.role === "admin" && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={unverify.isPending}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          unverify.mutate(doc.id);
+                        }}
+                      >
+                        Quitar verificación
+                      </Button>
+                    )}
                   </TD>
                 </TR>
               ))}

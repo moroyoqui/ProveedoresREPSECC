@@ -239,6 +239,7 @@ export type ComplianceCell = {
   month: number;
   status: CellStatus;
   document_id: number | null;
+  document_count: number;
   coverage_period_start: string | null;
 };
 
