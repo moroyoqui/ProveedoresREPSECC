@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Download, X, RefreshCcw, FileText, Plus, Loader2, CheckCircle, XCircle } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, X, RefreshCcw, FileText, Plus, Loader2, CheckCircle, XCircle, ShieldCheck } from "lucide-react";
 
 import { ApiError } from "@/lib/api";
 import { documentsApi } from "@/lib/api/index";
-import { useDocumentsList } from "@/lib/api/documents";
+import { useDocumentsList, validateDocumentType } from "@/lib/api/documents";
 import { Button } from "@/components/ui";
 
 const ADD_ALLOWED_MIME_TYPES = new Set([
@@ -41,6 +41,8 @@ export type DocumentViewerParams = {
   documentTypeName: string;
   coveragePeriodStart: string | null;
   canAddDocuments?: boolean;
+  typeValidated?: boolean;
+  canValidateType?: boolean;
 };
 
 type BlobUrlCache = Record<number, string>;
@@ -51,6 +53,8 @@ export function DocumentViewerModal({
   documentTypeName,
   coveragePeriodStart,
   canAddDocuments = false,
+  typeValidated = false,
+  canValidateType = false,
   onClose,
 }: DocumentViewerParams & { onClose: () => void }) {
   const [selectedIdx, setSelectedIdx] = useState(0);
@@ -60,6 +64,9 @@ export function DocumentViewerModal({
   const [addItems, setAddItems] = useState<AddFileItem[]>([]);
   const addFileRef = useRef<HTMLInputElement>(null);
   const addUploadingRef = useRef(false);
+  const [localTypeValidated, setLocalTypeValidated] = useState(typeValidated);
+  const [validating, setValidating] = useState(false);
+  const [validateError, setValidateError] = useState<string | null>(null);
 
   const { data, isLoading, isError, refetch } = useDocumentsList({
     supplier_id: supplierId,
@@ -141,6 +148,19 @@ export function DocumentViewerModal({
     }
   }
 
+  async function handleValidateType() {
+    setValidating(true);
+    setValidateError(null);
+    try {
+      await validateDocumentType(supplierId, documentTypeId, coveragePeriodStart);
+      setLocalTypeValidated(true);
+    } catch {
+      setValidateError("No se pudo validar el tipo de documento. Intenta de nuevo.");
+    } finally {
+      setValidating(false);
+    }
+  }
+
   async function handleAddFilesSelected(e: React.ChangeEvent<HTMLInputElement>) {
     const selected = Array.from(e.target.files ?? []);
     if (selected.length === 0) return;
@@ -211,7 +231,7 @@ export function DocumentViewerModal({
         <div className="flex h-full max-h-[88vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-2xl">
           {/* Header */}
           <div className="flex shrink-0 items-center justify-between border-b border-neutral-200 px-5 py-3">
-            <div>
+            <div className="flex flex-col gap-1">
               <p className="text-xs uppercase tracking-wide text-neutral-400">Documentos</p>
               <p className="text-sm font-semibold text-brand-700">{documentTypeName}</p>
               {coveragePeriodStart && (
@@ -223,6 +243,27 @@ export function DocumentViewerModal({
                   })}
                 </p>
               )}
+              {localTypeValidated ? (
+                <span className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
+                  <ShieldCheck size={12} />
+                  Tipo de documento validado
+                </span>
+              ) : canValidateType ? (
+                <div className="mt-0.5 flex flex-col gap-1">
+                  <button
+                    type="button"
+                    onClick={handleValidateType}
+                    disabled={validating}
+                    className="inline-flex items-center gap-1.5 rounded-md bg-green-600 px-3 py-1 text-xs font-semibold text-white hover:bg-green-700 disabled:opacity-60"
+                  >
+                    {validating ? <Loader2 size={12} className="animate-spin" /> : <ShieldCheck size={12} />}
+                    Marcar como Validado
+                  </button>
+                  {validateError && (
+                    <p className="text-xs text-status-expired">{validateError}</p>
+                  )}
+                </div>
+              ) : null}
             </div>
             <div className="flex items-center gap-2">
               <Button variant="ghost" className="px-2 py-1 text-xs" onClick={() => refetch()}>
@@ -291,7 +332,7 @@ export function DocumentViewerModal({
                 </ul>
               )}
 
-              {canAddDocuments && (
+              {canAddDocuments && !localTypeValidated && (
                 <>
                   <hr className="border-neutral-100" />
                   <div className="p-3">

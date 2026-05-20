@@ -134,6 +134,7 @@ async def callback(
             organization_id=user.organization_id,
             role=user.role.value,
             expires_at=fresh_expiry(),
+            supplier_id=user.supplier_id,
         )
 
     redirect_to = request.session.pop("redirect_to", None) or "/"
@@ -205,6 +206,7 @@ def login_local(
         organization_id=user.organization_id,
         role=user.role.value,
         expires_at=fresh_expiry(),
+        supplier_id=user.supplier_id,
     )
     sessions.issue(response, payload)
     return {"status": "ok", "user_id": user.id, "organization_id": user.organization_id}
@@ -230,6 +232,7 @@ def me(user: CurrentUser = Depends(current_user), db: Session = Depends(get_db))
         "email": _user_email(db, user.user_id),
         "display_name": _user_display(db, user.user_id),
         "role": user.role,
+        "supplier_id": user.supplier_id,
         "organization": OrganizationOut.model_validate(org).model_dump(),
     }
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from enum import StrEnum
 
-from sqlalchemy import BigInteger, Enum, String, UniqueConstraint
+from sqlalchemy import BigInteger, Enum, ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from repse.db.base import Base, TimestampMixin
@@ -16,6 +16,7 @@ class Role(StrEnum):
     ADMIN = "admin"
     MANAGER = "manager"
     VIEWER = "viewer"
+    SUPPLIER = "supplier"
 
 
 class UserStatus(StrEnum):
@@ -36,6 +37,9 @@ class User(Base, TimestampMixin, TenantOwned):
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    supplier_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("suppliers.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     email: Mapped[str] = mapped_column(String(255), nullable=False)
     oidc_subject: Mapped[str | None] = mapped_column(String(255), nullable=True)
     oidc_provider: Mapped[OidcProvider | None] = mapped_column(

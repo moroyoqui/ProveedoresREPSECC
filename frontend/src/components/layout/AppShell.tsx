@@ -34,6 +34,7 @@ export function AppShell() {
         email: me.email,
         displayName: me.display_name,
         role: me.role,
+        supplierId: me.supplier_id,
         organization: {
           id: me.organization.id,
           legalName: me.organization.legal_name,
@@ -49,51 +50,66 @@ export function AppShell() {
 
   return (
     <div className="flex min-h-full">
-      <aside className="hidden w-64 flex-col border-r border-neutral-200 bg-white md:flex">
-        <div className="flex h-16 items-center border-b border-neutral-200 px-6">
-          <p className="text-xs uppercase tracking-widest text-brand-500">REPSE</p>
+      <aside className="hidden w-64 flex-col border-r border-[#1e47b8] bg-[#2554C7] md:flex">
+        <div className="flex h-16 items-center border-b border-white/20 px-6">
+          <p className="text-xs uppercase tracking-widest text-white">REPSE</p>
         </div>
         {user?.organization && (
-          <div className="border-b border-neutral-100 px-6 py-3 text-sm">
-            <p className="font-medium text-brand-700">{user.organization.legalName}</p>
-            <p className="text-xs text-neutral-500">{user.organization.rfc}</p>
+          <div className="border-b border-white/20 px-6 py-3 text-sm">
+            <p className="font-medium text-white">{user.organization.legalName}</p>
+            <p className="text-xs text-blue-200">{user.organization.rfc}</p>
           </div>
         )}
         <nav className="flex-1 p-3">
-          {NAV.filter((item) => !item.adminOnly || user?.role === "admin").map((item) => {
-            const Icon = item.icon;
-            const active =
-              item.to === "/"
-                ? location.pathname === "/"
-                : location.pathname.startsWith(item.to);
-            return (
-              <Link
-                key={item.to}
-                to={item.to}
-                className={cn(
-                  "flex items-center gap-3 rounded-md px-3 py-2 text-sm",
-                  active
-                    ? "bg-brand-50 font-medium text-brand-700"
-                    : "text-neutral-600 hover:bg-neutral-50"
-                )}
-              >
-                <Icon size={16} />
-                {item.label}
-              </Link>
-            );
-          })}
+          {user?.role === "supplier" ? (
+            <Link
+              to="/portal"
+              className={cn(
+                "flex items-center gap-3 rounded-md px-3 py-2 text-sm",
+                location.pathname.startsWith("/portal")
+                  ? "bg-white/20 font-medium text-white"
+                  : "text-blue-100 hover:bg-white/10"
+              )}
+            >
+              <FileStack size={16} />
+              Mi documentación
+            </Link>
+          ) : (
+            NAV.filter((item) => !item.adminOnly || user?.role === "admin").map((item) => {
+              const Icon = item.icon;
+              const active =
+                item.to === "/"
+                  ? location.pathname === "/"
+                  : location.pathname.startsWith(item.to);
+              return (
+                <Link
+                  key={item.to}
+                  to={item.to}
+                  className={cn(
+                    "flex items-center gap-3 rounded-md px-3 py-2 text-sm",
+                    active
+                      ? "bg-white/20 font-medium text-white"
+                      : "text-blue-100 hover:bg-white/10"
+                  )}
+                >
+                  <Icon size={16} />
+                  {item.label}
+                </Link>
+              );
+            })
+          )}
         </nav>
-        <div className="border-t border-neutral-100 p-3 text-sm">
+        <div className="border-t border-white/20 p-3 text-sm">
           {user && (
             <div className="px-3 py-2">
-              <p className="font-medium text-brand-700">{user.displayName}</p>
-              <p className="text-xs text-neutral-500">{user.email}</p>
+              <p className="font-medium text-white">{user.displayName}</p>
+              <p className="text-xs text-blue-200">{user.email}</p>
             </div>
           )}
           <form action="/api/v1/auth/logout" method="post" className="block">
             <button
               type="submit"
-              className="mt-1 flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-neutral-600 hover:bg-neutral-50"
+              className="mt-1 flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-blue-100 hover:bg-white/10"
             >
               <LogOut size={16} />
               Cerrar sesión

@@ -18,13 +18,14 @@ import {
   TR,
 } from "@/components/ui";
 import { ApiError } from "@/lib/api";
-import { usersApi, type Role, type UserItem } from "@/lib/api/index";
+import { usersApi, suppliersApi, type Role, type UserItem } from "@/lib/api/index";
 import { useAuth } from "@/lib/auth";
 
 const ROLE_LABEL: Record<Role, string> = {
   admin: "Administrador",
   manager: "Gestor",
   viewer: "Consulta",
+  supplier: "Proveedor",
 };
 
 export function UsersListPage() {
@@ -114,6 +115,7 @@ export function UsersListPage() {
                     <option value="admin">{ROLE_LABEL.admin}</option>
                     <option value="manager">{ROLE_LABEL.manager}</option>
                     <option value="viewer">{ROLE_LABEL.viewer}</option>
+                    <option value="supplier">{ROLE_LABEL.supplier}</option>
                   </select>
                 </TD>
                 <TD>
@@ -172,8 +174,15 @@ function CreateUserDialog({ onClose }: { onClose: () => void }) {
   const [email, setEmail] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [role, setRole] = useState<Role>("viewer");
+  const [supplierId, setSupplierId] = useState<number | null>(null);
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+
+  const { data: suppliersData } = useQuery({
+    queryKey: ["suppliers", "active"],
+    queryFn: () => suppliersApi.list({ status: "active" }),
+    enabled: role === "supplier",
+  });
 
   const create = useMutation({
     mutationFn: () => {
@@ -183,6 +192,7 @@ function CreateUserDialog({ onClose }: { onClose: () => void }) {
         role,
       };
       if (password) body.password = password;
+      if (role === "supplier") body.supplier_id = supplierId;
       return usersApi.create(body);
     },
     onSuccess: () => {
@@ -200,7 +210,10 @@ function CreateUserDialog({ onClose }: { onClose: () => void }) {
     },
   });
 
-  const canSubmit = email.trim().length > 0 && displayName.trim().length > 0;
+  const canSubmit =
+    email.trim().length > 0 &&
+    displayName.trim().length > 0 &&
+    (role !== "supplier" || supplierId !== null);
 
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-brand-900/40 p-4">
@@ -232,13 +245,38 @@ function CreateUserDialog({ onClose }: { onClose: () => void }) {
             <select
               className="h-10 rounded-md border border-neutral-300 bg-white px-3 text-sm"
               value={role}
-              onChange={(e) => setRole(e.target.value as Role)}
+              onChange={(e) => {
+                setRole(e.target.value as Role);
+                setSupplierId(null);
+              }}
             >
               <option value="admin">{ROLE_LABEL.admin}</option>
               <option value="manager">{ROLE_LABEL.manager}</option>
               <option value="viewer">{ROLE_LABEL.viewer}</option>
+              <option value="supplier">{ROLE_LABEL.supplier}</option>
             </select>
           </div>
+          {role === "supplier" && (
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-brand-700">
+                Empresa proveedora <span className="text-status-expired">*</span>
+              </label>
+              <select
+                className="h-10 rounded-md border border-neutral-300 bg-white px-3 text-sm"
+                value={supplierId ?? ""}
+                onChange={(e) =>
+                  setSupplierId(e.target.value ? Number(e.target.value) : null)
+                }
+              >
+                <option value="">— Seleccionar empresa —</option>
+                {suppliersData?.items.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.legal_name} ({s.rfc})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <FormField
             label="Contraseña (opcional)"
             type="password"

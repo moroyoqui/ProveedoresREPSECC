@@ -17,6 +17,7 @@ import { SuppliersListPage } from "@/pages/suppliers/list";
 import { NewSupplierPage } from "@/pages/suppliers/new";
 import { DocumentsListPage } from "@/pages/documents/list";
 import { UsersListPage } from "@/pages/users/list";
+import { PortalPage } from "@/pages/portal/index";
 
 export function AppRouter() {
   return (
@@ -24,7 +25,8 @@ export function AppRouter() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/" element={<RequireAuth><AppShell /></RequireAuth>}>
-          <Route index element={<Navigate to="/suppliers" replace />} />
+          <Route index element={<RootRedirect />} />
+          <Route path="portal" element={<PortalPage />} />
           <Route path="suppliers" element={<SuppliersListPage />} />
           <Route path="suppliers/new" element={<NewSupplierPage />} />
           <Route path="suppliers/:id" element={<SupplierDetailPage />} />
@@ -45,6 +47,11 @@ export function AppRouter() {
   );
 }
 
+function RootRedirect() {
+  const { user } = useAuth();
+  return <Navigate to={user?.role === "supplier" ? "/portal" : "/suppliers"} replace />;
+}
+
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { user, setUser } = useAuth();
   const location = useLocation();
@@ -57,6 +64,7 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
         email: me.email,
         displayName: me.display_name,
         role: me.role,
+        supplierId: me.supplier_id,
         organization: {
           id: me.organization.id,
           legalName: me.organization.legal_name,

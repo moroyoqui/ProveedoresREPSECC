@@ -10,6 +10,7 @@ const MONTH_LABELS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "S
 type ViewerState = ViewerClickParams & {
   documentTypeName: string;
   cellStatus: CellStatus;
+  typeValidated: boolean;
 };
 
 type ComplianceGridProps = {
@@ -118,7 +119,7 @@ export function ComplianceGrid({ data, onUploadClick }: ComplianceGridProps) {
                                 : null
                             }
                             onViewerClick={(params) =>
-                              setViewerState({ ...params, documentTypeName: req.document_type.name, cellStatus: cell.status })
+                              setViewerState({ ...params, documentTypeName: req.document_type.name, cellStatus: cell.status, typeValidated: cell.type_validated ?? false })
                             }
                             onUploadClick={onUploadClick}
                           />
@@ -155,7 +156,7 @@ export function ComplianceGrid({ data, onUploadClick }: ComplianceGridProps) {
                             : null
                         }
                         onViewerClick={(params) =>
-                          setViewerState({ ...params, documentTypeName: req.document_type.name, cellStatus: cell.status })
+                          setViewerState({ ...params, documentTypeName: req.document_type.name, cellStatus: cell.status, typeValidated: cell.type_validated ?? false })
                         }
                         onUploadClick={onUploadClick}
                       />
@@ -176,7 +177,9 @@ export function ComplianceGrid({ data, onUploadClick }: ComplianceGridProps) {
           documentTypeId={viewerState.document_type_id}
           documentTypeName={viewerState.documentTypeName}
           coveragePeriodStart={viewerState.coverage_period_start}
-          canAddDocuments={viewerState.cellStatus !== "validated"}
+          canAddDocuments={!viewerState.typeValidated && viewerState.cellStatus !== "not_required"}
+          typeValidated={viewerState.typeValidated}
+          canValidateType={!viewerState.typeValidated && viewerState.cellStatus !== "not_required"}
           onClose={() => setViewerState(null)}
         />
       )}

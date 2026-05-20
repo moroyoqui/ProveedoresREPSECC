@@ -16,6 +16,7 @@ from typing import Any
 from sqlalchemy import extract, func, select
 from sqlalchemy.orm import Session
 
+from repse.compliance.models import ComplianceCellValidation
 from repse.compliance.schemas import (
     CellOut,
     CellStatus,
@@ -77,7 +78,7 @@ def cell_status(
             doc_status = doc_status.value
         if doc_status == DocumentStatus.EXPIRED.value:
             return CellStatus.EXPIRED
-        return CellStatus.VALIDATED if doc.verified else CellStatus.SUBMITTED
+        return CellStatus.SUBMITTED
 
     cell_start = date(year, month, 1)
     today_month_start = date(today.year, today.month, 1)
@@ -174,6 +175,21 @@ def get_annual_compliance(
         (int(r.document_type_id), int(r.m)): int(r.cnt) for r in count_rows
     }
 
+    # Load type-level validations for the supplier (bulk, one query).
+    # Keys: (document_type_id, coverage_period_start) where period is a date or None.
+    validation_rows = db.execute(
+        select(
+            ComplianceCellValidation.document_type_id,
+            ComplianceCellValidation.coverage_period_start,
+        ).where(
+            ComplianceCellValidation.organization_id == organization_id,
+            ComplianceCellValidation.supplier_id == supplier_id,
+        )
+    ).all()
+    validated_cells: set[tuple[int, date | None]] = {
+        (int(r.document_type_id), r.coverage_period_start) for r in validation_rows
+    }
+
     # Also pick up one-time documents (periodicity 'none' can have NULL coverage
     # period). We need to fetch them in a separate query because the WHERE above
     # filters by extract("year", coverage_period_start) which excludes NULLs.
@@ -228,16 +244,20 @@ def get_annual_compliance(
                 )
                 continue
             doc = docs_by_type_and_month.get((dt.id, month))
+            period_start = _coverage_start(month, year)
+            is_type_validated = (dt.id, period_start) in validated_cells
+            raw_status = cell_status(
+                doc, month=month, year=year, today=today,
+                due_month_offset=due_offset,
+            )
             cells.append(
                 CellOut(
                     month=month,
-                    status=cell_status(
-                        doc, month=month, year=year, today=today,
-                        due_month_offset=due_offset,
-                    ),
+                    status=CellStatus.VALIDATED if is_type_validated else raw_status,
                     document_id=doc.id if doc else None,
                     document_count=count_by_type_and_month.get((dt.id, month), 0),
-                    coverage_period_start=_coverage_start(month, year),
+                    coverage_period_start=period_start,
+                    type_validated=is_type_validated,
                 )
             )
         monthly.append(MonthlyRequirementOut(document_type=brief, cells=cells))

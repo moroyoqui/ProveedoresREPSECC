@@ -22,6 +22,7 @@ from repse.observability.sentry import init_sentry
 # Domain routers (Phase 3).
 from repse.audit.routes import router as audit_router
 from repse.auth.routes import router as auth_router
+from repse.portal.routes import router as portal_router
 from repse.compliance.routes import router as compliance_router
 from repse.documents.jobs import schedule_daily_recalculation
 from repse.documents.routes import router as documents_router
@@ -115,5 +116,6 @@ app.include_router(suppliers_router, prefix=f"{API_PREFIX}/suppliers", tags=["su
 app.include_router(documents_router, prefix=f"{API_PREFIX}", tags=["documents"])
 app.include_router(compliance_router, prefix=f"{API_PREFIX}", tags=["compliance"])
 app.include_router(audit_router, prefix=f"{API_PREFIX}/audit-log", tags=["audit-log"])
+app.include_router(portal_router, prefix=f"{API_PREFIX}/portal", tags=["portal"])
 
 __all__ = ["app"]

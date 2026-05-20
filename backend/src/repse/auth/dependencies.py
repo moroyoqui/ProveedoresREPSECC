@@ -23,6 +23,7 @@ class CurrentUser:
     user_id: int
     organization_id: int
     role: str
+    supplier_id: int | None = None
 
 
 def _session_manager(settings: Settings = Depends(get_settings)) -> SessionManager:
@@ -46,6 +47,7 @@ def current_user(
         user_id=payload.user_id,
         organization_id=payload.organization_id,
         role=payload.role,
+        supplier_id=payload.supplier_id,
     )
 
 

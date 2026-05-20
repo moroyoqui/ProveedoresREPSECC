@@ -18,6 +18,7 @@ from repse.db.session import get_db
 from repse.document_types.models import DocumentType
 from repse.documents import service
 from repse.documents.models import Document, OcrStatus
+from repse.documents.schemas import VerifyIn
 from repse.documents.service import UploadInput
 from repse.documents.storage import FileStore, InvalidToken, TokenExpired
 from repse.errors import Forbidden, NotFound, ValidationFailure
@@ -184,7 +185,7 @@ def download_file(
 @router.post("/documents/{document_id}/verify")
 def verify_document_route(
     document_id: int,
-    body: dict,
+    body: VerifyIn,
     user: CurrentUser = Depends(require_role(Role.ADMIN.value, Role.MANAGER.value)),
     db: Session = Depends(get_db),
 ) -> dict:
@@ -193,7 +194,7 @@ def verify_document_route(
         document_id=document_id,
         organization_id=user.organization_id,
         actor_user_id=user.user_id,
-        note=body.get("note"),
+        note=body.note,
     )
     return _serialize(db, doc)
 

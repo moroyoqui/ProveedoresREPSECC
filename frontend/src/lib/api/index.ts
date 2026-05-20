@@ -9,13 +9,14 @@ import { apiFetch } from "@/lib/api";
 
 // ---------- Auth + Org ----------
 
-export type Role = "admin" | "manager" | "viewer";
+export type Role = "admin" | "manager" | "viewer" | "supplier";
 
 export type MeResponse = {
   id: number;
   email: string;
   display_name: string;
   role: Role;
+  supplier_id?: number | null;
   organization: {
     id: number;
     legal_name: string;
@@ -42,6 +43,7 @@ export type UserItem = {
   display_name: string;
   role: Role;
   status: UserStatus;
+  supplier_id?: number | null;
   last_login_at: string | null;
 };
 
@@ -50,6 +52,7 @@ export type UserCreate = {
   display_name: string;
   role: Role;
   password?: string;
+  supplier_id?: number | null;
 };
 
 export type UserPatch = {
@@ -241,6 +244,7 @@ export type ComplianceCell = {
   document_id: number | null;
   document_count: number;
   coverage_period_start: string | null;
+  type_validated: boolean;
 };
 
 export type MonthlyRequirement = {
