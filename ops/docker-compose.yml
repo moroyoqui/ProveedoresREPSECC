@@ -49,6 +49,7 @@ services:
       TESSERACT_LANG: ${TESSERACT_LANG}
       SENTRY_DSN: ${SENTRY_DSN}
       PROMETHEUS_ENABLED: ${PROMETHEUS_ENABLED}
+    command: ["uvicorn", "repse.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--reload"]
     volumes:
       - uploads_data:${UPLOAD_ROOT}
       - ../backend:/app

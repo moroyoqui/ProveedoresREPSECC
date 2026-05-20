@@ -15,10 +15,11 @@ type ViewerState = ViewerClickParams & {
 
 type ComplianceGridProps = {
   data: ComplianceGridData;
+  readOnly?: boolean;
   onUploadClick?: (params: UploadClickParams) => void;
 };
 
-export function ComplianceGrid({ data, onUploadClick }: ComplianceGridProps) {
+export function ComplianceGrid({ data, readOnly = false, onUploadClick }: ComplianceGridProps) {
   const [viewerState, setViewerState] = useState<ViewerState | null>(null);
   if (data.monthly_requirements.length === 0) {
     return (
@@ -177,9 +178,9 @@ export function ComplianceGrid({ data, onUploadClick }: ComplianceGridProps) {
           documentTypeId={viewerState.document_type_id}
           documentTypeName={viewerState.documentTypeName}
           coveragePeriodStart={viewerState.coverage_period_start}
-          canAddDocuments={!viewerState.typeValidated && viewerState.cellStatus !== "not_required"}
+          canAddDocuments={!readOnly && !viewerState.typeValidated && viewerState.cellStatus !== "not_required"}
           typeValidated={viewerState.typeValidated}
-          canValidateType={!viewerState.typeValidated && viewerState.cellStatus !== "not_required"}
+          canValidateType={!readOnly && !viewerState.typeValidated && viewerState.cellStatus !== "not_required"}
           onClose={() => setViewerState(null)}
         />
       )}

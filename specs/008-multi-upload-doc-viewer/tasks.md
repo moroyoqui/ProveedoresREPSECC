@@ -226,20 +226,20 @@ No hay tareas en esta fase. Continúa en Phase 2.
 
 ### Backend: Modelo y migración
 
-- [ ] T027 [US6] Crear modelo SQLAlchemy `ComplianceCellValidation` en nuevo archivo `backend/src/repse/compliance/models.py`:
+- [x] T027 [US6] Crear modelo SQLAlchemy `ComplianceCellValidation` en nuevo archivo `backend/src/repse/compliance/models.py`:
   - Tabla: `compliance_cell_validations`
   - Campos: `id` (BigInteger PK autoincrement), `organization_id` (BigInteger NOT NULL), `supplier_id` (FK→suppliers CASCADE), `document_type_id` (FK→document_types RESTRICT), `coverage_period_start` (Date nullable), `validated_by` (FK→users SET NULL), `validated_at` (DateTime not null), y `TimestampMixin`
   - `UniqueConstraint("organization_id", "supplier_id", "document_type_id", "coverage_period_start", name="uq_cell_validation")`
   - Importar la nueva clase en `backend/src/repse/compliance/__init__.py` y en el `target_metadata` de `backend/alembic/env.py` para que Alembic la detecte en autogeneración
 
-- [ ] T028 [US6] Crear migración Alembic `backend/alembic/versions/0004_add_compliance_cell_validations.py`:
+- [x] T028 [US6] Crear migración Alembic `backend/alembic/versions/0004_add_compliance_cell_validations.py`:
   - `upgrade()`: `op.create_table("compliance_cell_validations", ...)` con todas las columnas del modelo T027, sus FK constraints y el `UniqueConstraint`
   - `downgrade()`: `op.drop_table("compliance_cell_validations")`
   - Encadenar con `down_revision = "0003_add_user_password"` (última migración existente)
 
 ### Backend: Endpoint
 
-- [ ] T029 [US6] Agregar endpoint `POST /suppliers/{supplier_id}/compliance/validate` en `backend/src/repse/compliance/routes.py`:
+- [x] T029 [US6] Agregar endpoint `POST /suppliers/{supplier_id}/compliance/validate` en `backend/src/repse/compliance/routes.py`:
   - Agregar schema `class ValidateCellIn(BaseModel): document_type_id: int; coverage_period_start: date | None = None` en el mismo archivo
   - Required role: `ADMIN` o `MANAGER` (`require_role(Role.ADMIN.value, Role.MANAGER.value)`)
   - Lógica: (1) verificar que el proveedor pertenece al tenant; (2) buscar registro existente en `ComplianceCellValidation` con la combinación `(organization_id, supplier_id, document_type_id, coverage_period_start)`; (3) si existe actualizarlo (`validated_by`, `validated_at`), si no crearlo; (4) `db.commit()`
@@ -247,24 +247,24 @@ No hay tareas en esta fase. Continúa en Phase 2.
 
 ### Backend: Servicio y schema
 
-- [ ] T030 [US6] Actualizar `backend/src/repse/compliance/service.py`:
+- [x] T030 [US6] Actualizar `backend/src/repse/compliance/service.py`:
   - Importar `ComplianceCellValidation` desde `repse.compliance.models`
   - En `get_annual_compliance()` (línea ~106), agregar una tercera query después de las dos existentes (docs y count_rows) que cargue todos los registros de `ComplianceCellValidation` del proveedor y año en un dict `validated_cells: set[tuple[int, int | None]]` con clave `(document_type_id, coverage_period_start_month)`
   - En el bucle de celdas mensuales (líneas ~219-242), pasar `type_validated=(dt.id, month) in validated_cells` al construir cada `CellOut`
   - Actualizar `cell_status()` (líneas 58-99): eliminar la línea `return CellStatus.VALIDATED if doc.verified else CellStatus.SUBMITTED`; reemplazar por `return CellStatus.SUBMITTED` cuando hay doc (VALIDATED ahora proviene del campo `type_validated` de `CellOut`, no de `cell_status()`); mantener toda la lógica de fechas para celdas sin doc
   - Nota: `CellOut.status` se asigna DESPUÉS de `cell_status()` — añadir override: si `type_validated` es True, forzar `status=CellStatus.VALIDATED` al construir `CellOut`
 
-- [ ] T031 [P] [US6] Agregar campo `type_validated: bool = False` a la clase `CellOut` en `backend/src/repse/compliance/schemas.py` (después del campo `document_count`)
+- [x] T031 [P] [US6] Agregar campo `type_validated: bool = False` a la clase `CellOut` en `backend/src/repse/compliance/schemas.py` (después del campo `document_count`)
 
 ### Frontend: API
 
-- [ ] T032 [P] [US6] Agregar función de mutación en `frontend/src/lib/api/documents.ts`:
+- [x] T032 [P] [US6] Agregar función de mutación en `frontend/src/lib/api/documents.ts`:
   - `export async function validateDocumentType(supplierId: number, documentTypeId: number, coveragePeriodStart: string | null): Promise<void>`: llama `apiFetch<void>(\`/suppliers/${supplierId}/compliance/validate\`, { method: "POST", body: JSON.stringify({ document_type_id: documentTypeId, coverage_period_start: coveragePeriodStart }) })`
   - Exportar como función directa (sin hook React Query; el componente gestiona el estado de carga localmente)
 
 ### Frontend: DocumentViewerModal
 
-- [ ] T033 [US6] Actualizar `frontend/src/components/documents/DocumentViewerModal.tsx`:
+- [x] T033 [US6] Actualizar `frontend/src/components/documents/DocumentViewerModal.tsx`:
   - Agregar props `typeValidated: boolean` y `canValidateType: boolean` al tipo `DocumentViewerParams` (líneas 38-44)
   - Agregar `import { validateDocumentType } from "@/lib/api/documents"` y el ícono `ShieldCheck` de lucide-react
   - Agregar estado local `const [localTypeValidated, setLocalTypeValidated] = useState(typeValidated)` y `const [validating, setValidating] = useState(false)` y `const [validateError, setValidateError] = useState<string | null>(null)`
@@ -277,7 +277,7 @@ No hay tareas en esta fase. Continúa en Phase 2.
 
 ### Frontend: ComplianceGrid
 
-- [ ] T034 [P] [US6] Actualizar `frontend/src/components/suppliers/ComplianceGrid.tsx`:
+- [x] T034 [P] [US6] Actualizar `frontend/src/components/suppliers/ComplianceGrid.tsx`:
   - Agregar campo `typeValidated: boolean` al tipo `ViewerState` (línea 10-13)
   - Al hacer clic en una esfera con documentos para abrir el visualizador, extraer `cell.type_validated` del `CellOut` correspondiente y asignarlo a `typeValidated` en el `ViewerState`
   - Al renderizar `<DocumentViewerModal>`:
