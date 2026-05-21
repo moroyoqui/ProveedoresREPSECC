@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Download, X, RefreshCcw, FileText, Plus, Loader2, CheckCircle, XCircle, ShieldCheck } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, X, RefreshCcw, FileText, Plus, Loader2, CheckCircle, XCircle, ShieldCheck, Upload } from "lucide-react";
 
 import { ApiError } from "@/lib/api";
 import { documentsApi } from "@/lib/api/index";
 import { useDocumentsList, validateDocumentType } from "@/lib/api/documents";
 import { Button } from "@/components/ui";
+import { SubmitValidationButton } from "@/components/portal/SubmitValidationButton";
 
 const ADD_ALLOWED_MIME_TYPES = new Set([
   "application/pdf",
@@ -43,6 +44,10 @@ export type DocumentViewerParams = {
   canAddDocuments?: boolean;
   typeValidated?: boolean;
   canValidateType?: boolean;
+  onAddMore?: () => void;
+  canSubmit?: boolean;
+  onSubmitted?: () => void;
+  uploadFn?: (file: File) => Promise<void>;
 };
 
 type BlobUrlCache = Record<number, string>;
@@ -55,6 +60,10 @@ export function DocumentViewerModal({
   canAddDocuments = false,
   typeValidated = false,
   canValidateType = false,
+  onAddMore,
+  canSubmit = false,
+  onSubmitted,
+  uploadFn,
   onClose,
 }: DocumentViewerParams & { onClose: () => void }) {
   const [selectedIdx, setSelectedIdx] = useState(0);
@@ -187,12 +196,16 @@ export function DocumentViewerModal({
     for (const item of toUpload) {
       setAddItems((prev) => prev.map((i) => (i.file === item.file ? { ...i, status: "uploading" as const } : i)));
       try {
-        await documentsApi.upload({
-          supplier_id: supplierId,
-          document_type_id: documentTypeId,
-          coverage_period_start: coveragePeriodStart ?? undefined,
-          file: item.file,
-        });
+        if (uploadFn) {
+          await uploadFn(item.file);
+        } else {
+          await documentsApi.upload({
+            supplier_id: supplierId,
+            document_type_id: documentTypeId,
+            ...(coveragePeriodStart != null ? { coverage_period_start: coveragePeriodStart } : {}),
+            file: item.file,
+          });
+        }
         setAddItems((prev) => prev.map((i) => (i.file === item.file ? { ...i, status: "success" as const } : i)));
         anySuccess = true;
       } catch (e) {
@@ -404,14 +417,34 @@ export function DocumentViewerModal({
                         <ChevronRight size={18} />
                       </button>
                     </div>
-                    <Button
-                      variant="secondary"
-                      className="gap-1 px-3 py-1.5 text-xs"
-                      onClick={() => handleDownload(selectedDoc.id)}
-                    >
-                      <Download size={14} />
-                      Descargar
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      {onAddMore && (
+                        <Button
+                          variant="ghost"
+                          className="gap-1 px-3 py-1.5 text-xs"
+                          onClick={onAddMore}
+                        >
+                          <Plus size={14} />
+                          Agregar archivos
+                        </Button>
+                      )}
+                      {canSubmit && onSubmitted && (
+                        <SubmitValidationButton
+                          documentTypeId={documentTypeId}
+                          documentTypeName={documentTypeName}
+                          coveragePeriodStart={coveragePeriodStart}
+                          onSubmitted={onSubmitted}
+                        />
+                      )}
+                      <Button
+                        variant="secondary"
+                        className="gap-1 px-3 py-1.5 text-xs"
+                        onClick={() => handleDownload(selectedDoc.id)}
+                      >
+                        <Download size={14} />
+                        Descargar
+                      </Button>
+                    </div>
                   </div>
 
                   {/* Preview content */}
@@ -457,8 +490,18 @@ export function DocumentViewerModal({
                   </div>
                 </>
               ) : (
-                <div className="flex flex-1 items-center justify-center text-sm text-neutral-400">
-                  Selecciona un archivo de la lista
+                <div className="flex flex-1 items-center justify-center">
+                  {canAddDocuments ? (
+                    <div className="flex flex-col items-center gap-3 text-center">
+                      <Upload size={40} className="text-neutral-300" />
+                      <div>
+                        <p className="text-sm font-medium text-neutral-600">No hay documentos todavía</p>
+                        <p className="text-xs text-neutral-400">Usa "Agregar documento" en la barra lateral para subir</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-neutral-400">Selecciona un archivo de la lista</p>
+                  )}
                 </div>
               )}
             </main>

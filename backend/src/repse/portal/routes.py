@@ -54,6 +54,7 @@ def portal_compliance(
         supplier_id=user.supplier_id,
         organization_id=user.organization_id,
         year=effective_year,
+        portal_mode=True,
     )
 
 
@@ -255,14 +256,12 @@ def portal_submit(
             details={"code": "cell_not_submittable"},
         )
 
-    pre_status_map = {
-        DocumentStatus.MISSING: PreSubmissionStatus.MISSING,
-        DocumentStatus.EXPIRED: PreSubmissionStatus.EXPIRED,
-    }
-    pre_status = pre_status_map.get(
-        latest_doc.status if latest_doc else DocumentStatus.MISSING,
-        PreSubmissionStatus.MISSING,
-    )
+    if latest_doc is None:
+        pre_status = PreSubmissionStatus.MISSING
+    elif latest_doc.status == DocumentStatus.EXPIRED:
+        pre_status = PreSubmissionStatus.EXPIRED
+    else:
+        pre_status = PreSubmissionStatus.PENDING
 
     submission = PortalSubmission(
         organization_id=user.organization_id,

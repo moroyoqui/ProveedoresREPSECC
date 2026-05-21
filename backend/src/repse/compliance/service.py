@@ -64,6 +64,7 @@ def cell_status(
     year: int,
     today: date,
     due_month_offset: int = 0,
+    portal_mode: bool = False,
 ) -> CellStatus:
     """Compute a single cell's status (see data-model.md §cell_status).
 
@@ -71,6 +72,9 @@ def cell_status(
     month. For bimonthly documents the period starts on month S and is due on
     S+2, so pass ``due_month_offset=2`` to keep the cell as PENDING until the
     due month has passed.
+
+    When ``portal_mode=True``, a valid document without a PortalSubmission shows
+    as PENDING (uploaded, awaiting explicit submission) instead of SUBMITTED.
     """
     if doc is not None:
         doc_status = doc.status
@@ -79,7 +83,7 @@ def cell_status(
             doc_status = doc_status.value
         if doc_status == DocumentStatus.EXPIRED.value:
             return CellStatus.EXPIRED
-        return CellStatus.SUBMITTED
+        return CellStatus.PENDING if portal_mode else CellStatus.SUBMITTED
 
     cell_start = date(year, month, 1)
     today_month_start = date(today.year, today.month, 1)
@@ -112,6 +116,7 @@ def get_annual_compliance(
     organization_id: int,
     year: int,
     today: date | None = None,
+    portal_mode: bool = False,
 ) -> ComplianceGridOut:
     """Build the annual compliance grid for the given supplier and year.
 
@@ -240,7 +245,7 @@ def get_annual_compliance(
 
         if periodicity == Periodicity.NONE:
             doc = docs_by_type_no_period.get(dt.id)
-            raw_status = cell_status(doc, month=1, year=year, today=today)
+            raw_status = cell_status(doc, month=1, year=year, today=today, portal_mode=portal_mode)
             is_pending = (dt.id, None) in pending_submissions
             final_status = CellStatus.SUBMITTED if is_pending else raw_status
             one_time.append(
@@ -273,7 +278,7 @@ def get_annual_compliance(
             is_pending = (dt.id, period_start) in pending_submissions
             raw_status = cell_status(
                 doc, month=month, year=year, today=today,
-                due_month_offset=due_offset,
+                due_month_offset=due_offset, portal_mode=portal_mode,
             )
             if is_type_validated:
                 final_status = CellStatus.VALIDATED

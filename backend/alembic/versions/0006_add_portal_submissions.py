@@ -34,8 +34,8 @@ def upgrade() -> None:
             status                ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending',
             rejection_reason      TEXT           NULL,
             pre_submission_status ENUM('missing','expired','pending') NOT NULL,
-            created_at            DATETIME       NOT NULL,
-            updated_at            DATETIME       NOT NULL,
+            created_at            DATETIME(6)    NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+            updated_at            DATETIME(6)    NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
             PRIMARY KEY (id),
             CONSTRAINT fk_ps_org
                 FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE,

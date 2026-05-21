@@ -8,6 +8,7 @@ from pathlib import Path
 
 from fastapi import UploadFile
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from repse.audit import actions as audit_actions
@@ -109,12 +110,15 @@ def upload_document(
 
     sha256 = hashlib.sha256(raw).hexdigest()
 
-    dup = db.execute(select(Document).where(Document.file_sha256 == sha256)).scalar_one_or_none()
-    if dup is not None:
-        raise Conflict(
-            "Identical file already exists",
-            details={"code": "duplicate_file", "existing_document_id": dup.id},
+    existing_doc = db.execute(
+        select(Document).where(
+            Document.organization_id == organization_id,
+            Document.file_sha256 == sha256,
+            Document.deleted_at.is_(None),
         )
+    ).scalar_one_or_none()
+    if existing_doc is not None:
+        raise Conflict("Identical file already exists", details={"code": "duplicate_file"})
 
     # Determine version number: max(existing) + 1 within (supplier, type, period).
     prev_latest = db.execute(
@@ -151,7 +155,14 @@ def upload_document(
         uploaded_by=actor_user_id,
     )
     db.add(doc)
-    db.flush()
+    try:
+        db.flush()
+    except IntegrityError:
+        db.rollback()
+        raise Conflict(
+            "Identical file already exists",
+            details={"code": "duplicate_file"},
+        )
 
     # Status now that we know dates.
     doc.status = compute_status(doc, today=datetime.now(timezone.utc).date(),

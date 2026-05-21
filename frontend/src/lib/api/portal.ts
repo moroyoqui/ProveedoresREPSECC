@@ -62,7 +62,11 @@ export const portalApi = {
     coveragePeriodStart?: string,
   ): Promise<UploadOut> => {
     const form = new FormData();
-    form.append("file", file);
+    const dotIdx = file.name.lastIndexOf(".");
+    const base = dotIdx !== -1 ? file.name.slice(0, dotIdx) : file.name;
+    const ext = dotIdx !== -1 ? file.name.slice(dotIdx) : "";
+    const renamedFile = new File([file], `${base}_${crypto.randomUUID()}${ext}`, { type: file.type });
+    form.append("file", renamedFile);
     form.append("document_type_id", String(documentTypeId));
     if (coveragePeriodStart != null) {
       form.append("coverage_period_start", coveragePeriodStart);

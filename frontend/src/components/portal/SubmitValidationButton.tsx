@@ -6,7 +6,8 @@ import { ApiError } from "@/lib/api";
 import { portalApi } from "@/lib/api/portal";
 
 function apiErrorMessage(e: ApiError): string {
-  switch (e.code) {
+  const code = (e.details?.code as string | undefined) ?? e.code;
+  switch (code) {
     case "no_documents_uploaded":
       return "Debes cargar al menos un documento antes de enviar a validación.";
     case "already_submitted":
@@ -67,7 +68,7 @@ export function SubmitValidationButton({
       <Button
         size="sm"
         variant="primary"
-        className="bg-indigo-600 hover:bg-indigo-700 focus-visible:ring-indigo-500"
+        className="bg-emerald-600 hover:bg-emerald-700 focus-visible:ring-emerald-500"
         onClick={() => { setError(null); setShowConfirm(true); }}
       >
         <Send size={14} className="mr-1.5 shrink-0" />
@@ -75,7 +76,7 @@ export function SubmitValidationButton({
       </Button>
 
       {showConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-sm rounded-xl border border-neutral-200 bg-white p-6 shadow-lg">
             <h3 className="text-base font-semibold text-neutral-900">
               ¿Enviar a validación?
@@ -108,7 +109,7 @@ export function SubmitValidationButton({
               <Button
                 size="sm"
                 variant="primary"
-                className="bg-indigo-600 hover:bg-indigo-700"
+                className="bg-emerald-600 hover:bg-emerald-700"
                 onClick={handleConfirm}
                 disabled={isSubmitting}
               >

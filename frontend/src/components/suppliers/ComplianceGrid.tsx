@@ -20,9 +20,11 @@ type ComplianceGridProps = {
   readOnly?: boolean;
   onUploadClick?: (params: UploadClickParams) => void;
   portalMode?: boolean;
+  onSubmitted?: () => void;
+  uploadFn?: (file: File, documentTypeId: number, coveragePeriodStart: string | null) => Promise<void>;
 };
 
-export function ComplianceGrid({ data, readOnly = false, onUploadClick, portalMode = false }: ComplianceGridProps) {
+export function ComplianceGrid({ data, readOnly = false, onUploadClick, portalMode = false, onSubmitted, uploadFn }: ComplianceGridProps) {
   const [viewerState, setViewerState] = useState<ViewerState | null>(null);
   if (data.monthly_requirements.length === 0) {
     return (
@@ -122,11 +124,8 @@ export function ComplianceGrid({ data, readOnly = false, onUploadClick, portalMo
                                 ? String(cell.coverage_period_start)
                                 : null
                             }
-                            onViewerClick={
-                              portalMode && PORTAL_UPLOADABLE.has(cell.status)
-                                ? undefined
-                                : (params) =>
-                                    setViewerState({ ...params, documentTypeName: req.document_type.name, cellStatus: cell.status, typeValidated: cell.type_validated ?? false })
+                            onViewerClick={(params) =>
+                              setViewerState({ ...params, documentTypeName: req.document_type.name, cellStatus: cell.status, typeValidated: cell.type_validated ?? false })
                             }
                             onUploadClick={onUploadClick}
                           />
@@ -162,13 +161,10 @@ export function ComplianceGrid({ data, readOnly = false, onUploadClick, portalMo
                             ? String(cell.coverage_period_start)
                             : null
                         }
-                        onViewerClick={
-                          portalMode && PORTAL_UPLOADABLE.has(cell.status)
-                            ? undefined
-                            : (params) =>
-                                setViewerState({ ...params, documentTypeName: req.document_type.name, cellStatus: cell.status, typeValidated: cell.type_validated ?? false })
+                        onViewerClick={(params) =>
+                          setViewerState({ ...params, documentTypeName: req.document_type.name, cellStatus: cell.status, typeValidated: cell.type_validated ?? false })
                         }
-                        onUploadClick={onUploadClick}
+                        {...(!portalMode && onUploadClick ? { onUploadClick } : {})}
                       />
                     </div>
                   );
@@ -187,9 +183,20 @@ export function ComplianceGrid({ data, readOnly = false, onUploadClick, portalMo
           documentTypeId={viewerState.document_type_id}
           documentTypeName={viewerState.documentTypeName}
           coveragePeriodStart={viewerState.coverage_period_start}
-          canAddDocuments={!readOnly && !viewerState.typeValidated && viewerState.cellStatus !== "not_required"}
+          canAddDocuments={
+            portalMode
+              ? PORTAL_UPLOADABLE.has(viewerState.cellStatus) && !viewerState.typeValidated
+              : !readOnly && !viewerState.typeValidated && viewerState.cellStatus !== "not_required"
+          }
           typeValidated={viewerState.typeValidated}
-          canValidateType={!readOnly && !viewerState.typeValidated && viewerState.cellStatus !== "not_required"}
+          canValidateType={!portalMode && !readOnly && !viewerState.typeValidated && viewerState.cellStatus !== "not_required"}
+          canSubmit={portalMode && PORTAL_UPLOADABLE.has(viewerState.cellStatus)}
+          {...(portalMode && onSubmitted
+            ? { onSubmitted: () => { onSubmitted(); setViewerState(null); } }
+            : {})}
+          {...(portalMode && uploadFn
+            ? { uploadFn: (file) => uploadFn(file, viewerState.document_type_id, viewerState.coverage_period_start) }
+            : {})}
           onClose={() => setViewerState(null)}
         />
       )}
