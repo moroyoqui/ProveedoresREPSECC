@@ -61,19 +61,21 @@ El proveedor puede consultar el historial completo de documentos entregados para
 
 ### User Story 5 — Carga de documentos faltantes o vencidos (Priority: P2)
 
-El proveedor puede cargar un documento directamente desde el portal para cualquier período del mes en curso hacia atrás, siempre que el estado del tipo de documento en ese período sea "Faltante" o "Vencido". No puede cargar documentos para períodos futuros ni para tipos que ya tienen un documento vigente en ese período.
+El proveedor puede cargar uno o más documentos directamente desde el portal para cualquier período del mes en curso hacia atrás, siempre que el estado del tipo de documento en ese período sea "Faltante" o "Vencido". No puede cargar documentos para períodos futuros ni para tipos que ya tienen un documento vigente en ese período. El diálogo de carga del portal presenta el mismo aspecto y comportamiento que el diálogo de carga de la interfaz administrativa: lista de archivos con estado individual, validación por archivo y retroalimentación inmediata; el tipo de documento y el período quedan predeterminados por el contexto del portal.
 
 **Why this priority**: Sin esta capacidad, el proveedor solo puede visualizar su situación pero no actuar; la carga es la acción de mayor valor del portal porque reduce la dependencia del administrador para subsanar incumplimientos.
 
-**Independent Test**: Un proveedor con al menos un tipo de documento en estado "Faltante" o "Vencido" puede cargar un archivo desde el portal sin intervención del administrador, y el estado de ese tipo se actualiza en la misma sesión.
+**Independent Test**: Un proveedor con al menos un tipo de documento en estado "Faltante" o "Vencido" puede cargar uno o varios archivos desde el portal sin intervención del administrador, ver el estado individual de cada archivo durante y después de la carga, y el estado del tipo de documento se actualiza en la misma sesión.
 
 **Acceptance Scenarios**:
 
-1. **Given** un tipo de documento tiene estado "Faltante" para el mes en curso, **When** el proveedor selecciona ese tipo y carga un archivo válido, **Then** el sistema registra la entrega y actualiza el estado visible en el portal.
+1. **Given** un tipo de documento tiene estado "Faltante" para el mes en curso, **When** el proveedor selecciona ese tipo y carga uno o más archivos válidos, **Then** el sistema registra cada entrega y actualiza el estado visible en el portal.
 2. **Given** un tipo de documento tiene estado "Vencido" para un período pasado, **When** el proveedor accede a ese período e intenta cargar un reemplazo, **Then** el sistema permite la carga y refleja el nuevo estado para ese período.
 3. **Given** un tipo de documento tiene estado "Vigente" para el período actual, **When** el proveedor intenta cargar otro documento para ese mismo período, **Then** el sistema bloquea la acción e informa que el período ya está cubierto.
 4. **Given** un período futuro (mayor al mes en curso), **When** el proveedor intenta cargar un documento para ese período, **Then** el sistema no ofrece la opción de carga para ese período.
-5. **Given** el archivo que el proveedor intenta cargar supera el tamaño máximo permitido o tiene un formato no aceptado, **When** confirma la carga, **Then** el sistema rechaza el archivo con un mensaje que indica el motivo y los formatos/tamaños aceptados.
+5. **Given** el archivo que el proveedor intenta cargar supera el tamaño máximo permitido o tiene un formato no aceptado, **When** confirma la carga, **Then** el sistema rechaza ese archivo con un mensaje que indica el motivo y los formatos/tamaños aceptados, sin afectar los demás archivos seleccionados.
+6. **Given** el proveedor selecciona varios archivos y algunos son inválidos, **When** confirma la carga, **Then** el diálogo muestra el estado individual de cada archivo (éxito, error, pendiente) y permite reintentar solo los que fallaron por causas recuperables.
+7. **Given** el proveedor carga el mismo archivo PDF (mismo contenido) que ya fue cargado previamente en otro período o por otro usuario, **When** confirma la carga, **Then** el sistema almacena el archivo sin error de duplicado, dado que el nombre de almacenamiento es siempre único gracias al sufijo UUID.
 
 ---
 
@@ -121,6 +123,8 @@ El portal presenta una sección de alertas que agrupa todos los tipos de documen
 - ¿Se permite cargar múltiples archivos para un mismo período y tipo de documento, o solo se acepta uno? → **Resuelto**: sí, con máximo configurable por tipo en el catálogo.
 - ¿Qué ocurre si el personal de contabilidad rechaza la documentación enviada? ¿El estado regresa al estado previo al envío ("Faltante" o "Vencido") y se habilita nuevamente el botón "Enviar a validar"?
 - ¿Puede el proveedor añadir más archivos a un tipo de documento que ya está en estado "Pendiente de validación", o la carga queda bloqueada hasta que contabilidad procese la solicitud? → **Resuelto**: bloqueada; el proveedor debe esperar la resolución de contabilidad.
+- ¿Qué año se usa en la ruta de almacenamiento para documentos sin período de cobertura (periodicidad "ninguna")? → Se usa el año calendario del momento de la carga.
+- ¿Cómo se construye el sufijo UUID cuando el nombre original no tiene extensión? → Se agrega el sufijo antes de la extensión si existe; si no hay extensión, se agrega al final del nombre.
 
 ## Requirements *(mandatory)*
 
@@ -148,6 +152,9 @@ El portal presenta una sección de alertas que agrupa todos los tipos de documen
 - **FR-021**: Cuando el personal de contabilidad **rechaza** una solicitud, el sistema DEBE requerir que ingrese un motivo de rechazo antes de confirmar la acción. El estado del tipo de documento DEBE regresar a su estado previo al envío ("Faltante" o "Vencido") y el motivo de rechazo DEBE ser visible para el proveedor en el portal, habilitando nuevamente la carga y el re-envío.
 - **FR-022**: Al presionar "Enviar a validar", el sistema DEBE registrar la fecha y hora exacta del envío asociada al paquete de validación. Este dato DEBE ser accesible para el personal de contabilidad desde su futura interfaz de revisión para permitir priorización por antigüedad.
 - **FR-019**: El estado "Pendiente de validación" DEBE ser claramente distinguible de los demás estados en la vista del portal del proveedor. El sistema DEBE persistir los datos del paquete enviado (archivos, fecha de envío, motivo de rechazo si aplica) de modo que el personal de contabilidad pueda acceder a ellos desde la interfaz de revisión que será desarrollada en una feature separada. La interfaz de contabilidad está **fuera del alcance** de esta feature.
+- **FR-026**: El sistema DEBE almacenar cada archivo en una ruta que incluya el año del período de cobertura y el identificador del proveedor como segmentos de directorio, siguiendo el patrón `{organización}/{año}/{proveedor}/{documento_id}/v{versión}.{ext}`. Para documentos sin período de cobertura, el año utilizado DEBE ser el año calendario del momento de la carga. Esta estructura garantiza que los archivos de diferentes años y proveedores queden segregados en el sistema de archivos y sean fácilmente localizables para auditoría.
+- **FR-027**: Cada archivo almacenado en disco DEBE tener un nombre que combine el nombre original del archivo (sin extensión) con un sufijo UUID v4 único separado por un guión bajo, preservando la extensión original al final (ej. `contrato_enero_a1b2c3d4-e5f6-7890-abcd-ef1234567890.pdf`). Este esquema DEBE garantizar que dos cargas del mismo archivo, o de archivos con el mismo nombre pero diferente contenido, nunca colisionen en el sistema de archivos. El nombre original DEBE seguir almacenándose en la base de datos como referencia para el usuario.
+- **FR-028**: El diálogo de carga del portal del proveedor DEBE ofrecer las mismas capacidades de selección y retroalimentación que el diálogo de carga de la interfaz administrativa: selección de múltiples archivos en una sola operación, visualización del estado individual de cada archivo (pendiente, subiendo, éxito, error), posibilidad de reintentar archivos fallidos individualmente, y mensajes de error específicos por archivo. A diferencia del diálogo administrativo, el tipo de documento y el período de cobertura DEBEN quedar predeterminados por el contexto del portal y no solicitarse al usuario.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -174,6 +181,8 @@ El portal presenta una sección de alertas que agrupa todos los tipos de documen
 - **SC-008**: El estado del tipo de documento cargado se actualiza visualmente en el portal en menos de 3 segundos tras confirmar la carga, sin que el proveedor deba realizar ninguna acción adicional para ver el cambio.
 - **SC-009**: El botón "Enviar a validar" es visible sin desplazamiento dentro de la vista del tipo de documento y utiliza un color de acción destacado que lo distingue claramente de botones secundarios o de carga.
 - **SC-010**: Tras presionar "Enviar a validar", el estado del tipo de documento cambia a "Pendiente de validación" en menos de 3 segundos y el botón queda inhabilitado, sin que el proveedor deba recargar la página.
+- **SC-011**: El sistema nunca rechaza la carga de un archivo válido con un error de "duplicado" cuando el archivo tiene el mismo nombre original que otro ya cargado, independientemente del período, proveedor u organización; la unicidad en disco está garantizada por el sufijo UUID.
+- **SC-012**: El proveedor puede cargar varios archivos para el mismo tipo y período en una sola operación desde el portal, con el mismo flujo y retroalimentación que en la interfaz administrativa.
 
 ## Clarifications
 
@@ -198,3 +207,5 @@ El portal presenta una sección de alertas que agrupa todos los tipos de documen
 - El diseño responsivo (móvil) es deseable pero secundario respecto a la funcionalidad de escritorio en v1.
 - Los roles son mutuamente excluyentes: un usuario no puede ser administrador y proveedor al mismo tiempo.
 - La interfaz para que el personal de contabilidad apruebe o rechace solicitudes en "Pendiente de validación" está **fuera del alcance** de esta feature; será desarrollada en una feature independiente. Esta feature solo entrega el modelo de datos y el cambio de estado necesario para soportar esa futura interfaz.
+- El nombre original del archivo se conserva en la base de datos para mostrarse al usuario; la ruta física en disco incorpora un sufijo UUID para garantizar unicidad sin depender del contenido (SHA256) como único mecanismo de deduplicación.
+- La estructura de directorios por año se basa en el año del período de cobertura del documento; si el documento no tiene período (periodicidad "ninguna"), se usa el año de carga.

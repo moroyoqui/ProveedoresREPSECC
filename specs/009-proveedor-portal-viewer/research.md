@@ -1,7 +1,7 @@
 # Research: Portal del Proveedor — Visor de Documentación
 
 **Feature**: 009-proveedor-portal-viewer  
-**Date**: 2026-05-19
+**Date**: 2026-05-20 (actualizado con US5 y US6)
 
 ---
 
@@ -51,11 +51,15 @@
 
 ---
 
-## Decision 5: Portal de solo lectura en v1
+## Decision 5: Carga de documentos desde el portal (US5)
 
-**Decision**: El proveedor no puede cargar, editar ni eliminar documentos desde el portal en v1. El portal es estrictamente de lectura.
+**Decision**: Agregar `POST /api/v1/portal/upload` que reutiliza el servicio de documentos existente (`documents/service.py`) pero restringido al propio `supplier_id` de la sesión. El portal valida que el período sea ≤ mes actual y que el estado actual de la celda sea `missing` o `expired`. No se permiten cargas para períodos futuros ni para celdas en estado `submitted`, `validated`, o `expiring_soon`.
 
-**Rationale**: El spec lo establece explícitamente como supuesto de v1. Simplifica los permisos (el rol `supplier` no necesita acceso a endpoints de escritura de documentos) y reduce la superficie de revisión de seguridad.
+**Rationale**: Delegar la carga al servicio existente evita duplicar lógica de almacenamiento, validación de formato/tamaño y versionado. La única capa adicional es la autorización de rol+supplier y la validación de estado de celda. Coherente con el principio YAGNI.
+
+**Alternatives considered**:  
+- Endpoint de carga completamente independiente: duplicaría validaciones de formato, almacenamiento de archivo y versionado ya probados en el servicio admin.
+- Reutilizar `POST /documents` con filtros: el endpoint admin acepta cualquier `supplier_id` en el body; reutilizarlo implicaría que el proveedor podría cargar en nombre de otro proveedor si no se valida correctamente.
 
 ---
 
@@ -75,11 +79,56 @@
 
 ---
 
+## Decision 8: Nueva tabla `portal_submissions` para el flujo de envío a validación (US6)
+
+**Decision**: Nueva tabla `portal_submissions` que registra el envío de un tipo de documento + período por parte del proveedor. Campos clave: `supplier_id`, `document_type_id`, `coverage_period_start` (NULL para documentos únicos), `submitted_at`, `submitted_by`, `status` (pending/approved/rejected), `rejection_reason`, `pre_submission_status` (missing/expired — estado anterior al envío para poder revertir correctamente). No se aplica constraint UNIQUE a nivel de BD; la lógica de negocio garantiza que solo existe una fila con `status = 'pending'` por celda en cada momento.
+
+**Rationale**: 
+- Separar la tabla de submissions de `compliance_cell_validations` mantiene la semántica limpia: `ComplianceCellValidation` es para aprobaciones explícitas de supervisor; `portal_submissions` es para solicitudes de revisión iniciadas por el proveedor.
+- Requiere `pre_submission_status` para poder revertir al estado correcto si contabilidad rechaza (FR-021).
+- Registra `submitted_at` para que contabilidad pueda priorizar por antigüedad (FR-022).
+- Sin constraint UNIQUE en BD: permite múltiples rondas de envío/rechazo/re-envío manteniendo historial. El status 'pending' único por celda se valida en la capa de aplicación.
+
+**Alternatives considered**:  
+- Extender `ComplianceCellValidation` con campos de submission: mezcla semántica (aprobaciones admin vs. solicitudes supplier); haría más compleja la query de estado de celda.
+- Agregar `submitted_at` directamente al `Document`: un tipo de documento puede tener múltiples archivos por período; no hay un único documento al que anclar el envío; la tabla de submissions es más clara.
+- Flag `is_submitted` en `Document`: no soporta múltiples archivos por período enviados como paquete, ni el motivo de rechazo, ni el historial de rondas.
+
+---
+
+## Decision 9: Endpoint `POST /portal/submit/{document_type_id}` para envío a validación
+
+**Decision**: Endpoint específico para cambiar el estado de una celda a "pendiente de validación". Recibe `coverage_period_start` en el body (o null para documentos únicos). Valida que: (a) haya al menos un documento cargado en esa celda, (b) la celda no esté ya en estado `submitted`, (c) la celda no esté en estado `validated`. Crea un registro en `portal_submissions` con `status='pending'` y `submitted_at=utcnow()`.
+
+**Rationale**: Separar el endpoint de carga del de envío a validación mantiene la acción de "soy proveedor y ya cargué todo, enviar a revisión" explícita e independiente del upload. Esto corresponde directamente al flujo descrito en US6: primero se cargan archivos, luego se presiona "Enviar a validar" como acción deliberada.
+
+**Alternatives considered**:  
+- Envío automático al cargar: contrario al spec (US6 requiere acción explícita del proveedor); el proveedor puede querer cargar múltiples archivos antes de enviar.
+- Usar PATCH en el documento para cambiar un campo `is_submitted`: no aplica al nivel de tipo+período; no registra metadatos de submission.
+
+---
+
+## Decision 10: Actualización del `cell_status()` para reflejar `portal_submissions`
+
+**Decision**: La función `compliance.service.get_annual_compliance()` recibirá un conjunto de celdas pendientes de validación (`pending_submissions`) consultado en una query adicional sobre `portal_submissions`. Si una celda está en ese conjunto, su status se retorna como `CellStatus.SUBMITTED`, independientemente del estado del `Document` individual.
+
+**Rationale**: La lectura del grid ya realiza dos queries consolidadas; agregar una tercera query para submissions pendientes mantiene la misma arquitectura. Consultar submissions dentro del servicio centraliza la lógica de estado en un solo lugar en lugar de distribuirla en el endpoint de portal.
+
+**Alternatives considered**:  
+- Consultar submissions en el router del portal y parcharlos sobre el grid: duplica lógica de celda; más difícil de probar.
+- Campo `is_submitted` en `Document`: no funciona cuando hay múltiples archivos por celda; la submission es una operación a nivel de (tipo+período), no de archivo individual.
+
+---
+
 ## Unknowns resueltos
 
 | Pregunta | Respuesta |
 |---|---|
 | ¿Se necesita tabla nueva para la relación usuario-proveedor? | No; FK nullable en `users.supplier_id` es suficiente para v1 |
-| ¿El portal endpoint requiere nueva lógica de negocio? | No; reutiliza `compliance.service.get_annual_compliance()` íntegramente |
+| ¿El portal endpoint requiere nueva lógica de negocio? | No para lectura; sí para upload (POST /portal/upload) y submit (POST /portal/submit) |
 | ¿La sesión necesita cambios breaking? | No; `supplier_id` se agrega como campo opcional backward-compatible |
-| ¿Se necesita migración de datos? | No; la columna es nullable con default NULL |
+| ¿Se necesita migración de datos? | Sí para `portal_submissions`; la columna `users.supplier_id` es nullable con default NULL |
+| ¿Puede el proveedor cargar múltiples archivos por celda? | Sí, con máximo configurable en el catálogo de tipos de documento |
+| ¿La interfaz de aprobación/rechazo de contabilidad está en scope? | No — solo el modelo de datos y el endpoint de submit; la UI de contabilidad es feature separada |
+| ¿Qué pasa cuando contabilidad rechaza? | Estado regresa al `pre_submission_status` registrado en `portal_submissions`; motivo de rechazo visible al proveedor; carga y re-envío habilitados |
+| ¿Puede el proveedor cargar mientras está en Pendiente de validación? | No — la carga está bloqueada hasta que contabilidad resuelva |

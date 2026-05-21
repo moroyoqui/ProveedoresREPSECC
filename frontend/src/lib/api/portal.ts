@@ -1,5 +1,5 @@
 /**
- * API del portal del proveedor — solo lectura, requiere rol supplier.
+ * API del portal del proveedor — requiere rol supplier.
  */
 
 import { apiFetch } from "@/lib/api";
@@ -18,6 +18,35 @@ export type DocumentHistoryItem = {
   created_at: string | null;
 };
 
+export type UploadOut = {
+  id: number;
+  document_type_id: number;
+  coverage_period_start: string | null;
+  coverage_period_end: string | null;
+  status: string;
+  file_name_original: string;
+  file_size_bytes: number;
+  version: number;
+  created_at: string;
+};
+
+export type SubmissionOut = {
+  submission_id: number;
+  supplier_id: number;
+  document_type_id: number;
+  coverage_period_start: string | null;
+  submitted_at: string;
+  status: "pending" | "approved" | "rejected";
+};
+
+export type SubmissionDetail = {
+  submission_id: number;
+  status: "pending" | "approved" | "rejected";
+  submitted_at: string;
+  rejection_reason: string | null;
+  rejected_at: string | null;
+};
+
 export const portalApi = {
   getCompliance: (year?: number): Promise<ComplianceGrid> =>
     apiFetch<ComplianceGrid>(
@@ -26,4 +55,38 @@ export const portalApi = {
 
   getDocumentHistory: (documentTypeId: number): Promise<DocumentHistoryItem[]> =>
     apiFetch<DocumentHistoryItem[]>(`/portal/history/${documentTypeId}`),
+
+  upload: (
+    file: File,
+    documentTypeId: number,
+    coveragePeriodStart?: string,
+  ): Promise<UploadOut> => {
+    const form = new FormData();
+    form.append("file", file);
+    form.append("document_type_id", String(documentTypeId));
+    if (coveragePeriodStart != null) {
+      form.append("coverage_period_start", coveragePeriodStart);
+    }
+    return apiFetch<UploadOut>("/portal/upload", { method: "POST", body: form });
+  },
+
+  submit: (
+    documentTypeId: number,
+    coveragePeriodStart: string | null,
+  ): Promise<SubmissionOut> =>
+    apiFetch<SubmissionOut>(`/portal/submit/${documentTypeId}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ coverage_period_start: coveragePeriodStart }),
+    }),
+
+  getSubmission: (
+    documentTypeId: number,
+    coveragePeriodStart?: string,
+  ): Promise<SubmissionDetail | null> => {
+    const qs = coveragePeriodStart
+      ? `?coverage_period_start=${encodeURIComponent(coveragePeriodStart)}`
+      : "";
+    return apiFetch<SubmissionDetail | null>(`/portal/submission/${documentTypeId}${qs}`);
+  },
 };

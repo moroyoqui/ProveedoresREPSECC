@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, FileStack } from "lucide-react";
 
 import { Badge, Card, CardBody, CardHeader, CardTitle } from "@/components/ui";
@@ -8,8 +8,12 @@ import type { CellStatus, MonthlyRequirement, OneTimeRequirement, ComplianceGrid
 import { documentsApi } from "@/lib/api/index";
 import { portalApi } from "@/lib/api/portal";
 import { ComplianceGrid as ComplianceGridComponent } from "@/components/suppliers/ComplianceGrid";
+import type { UploadClickParams } from "@/components/suppliers/ComplianceCell";
 import { ComplianceSummary } from "@/components/suppliers/ComplianceSummary";
 import { OneTimeRequirements } from "@/components/suppliers/OneTimeRequirements";
+import { UploadPortalDialog } from "@/components/portal/UploadPortalDialog";
+import { SubmitValidationButton } from "@/components/portal/SubmitValidationButton";
+import { RejectionReasonBanner } from "@/components/portal/RejectionReasonBanner";
 
 const CURRENT_YEAR = new Date().getFullYear();
 const YEAR_OPTIONS = Array.from({ length: CURRENT_YEAR - 2019 }, (_, i) => CURRENT_YEAR - i);
@@ -117,10 +121,136 @@ function AlertsSection({
   );
 }
 
+// ─── PendingSubmitSection ─────────────────────────────────────────────────────
+
+const SUBMITTABLE: ReadonlySet<CellStatus | string> = new Set(["missing", "expired", "pending"]);
+
+type SubmitRowProps = {
+  documentTypeId: number;
+  documentTypeName: string;
+  coveragePeriodStart: string | null;
+  onSubmitted: () => void;
+};
+
+function CellSubmitRow({
+  documentTypeId,
+  documentTypeName,
+  coveragePeriodStart,
+  onSubmitted,
+}: SubmitRowProps) {
+  const { data: submission } = useQuery({
+    queryKey: ["portal-submission", documentTypeId, coveragePeriodStart],
+    queryFn: () =>
+      portalApi.getSubmission(documentTypeId, coveragePeriodStart ?? undefined),
+    staleTime: 30_000,
+  });
+
+  const periodLabel = coveragePeriodStart
+    ? new Date(coveragePeriodStart + "T00:00:00").toLocaleDateString("es-MX", {
+        year: "numeric",
+        month: "long",
+      })
+    : null;
+
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border border-neutral-200 bg-white p-4">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-neutral-800">{documentTypeName}</p>
+          {periodLabel && (
+            <p className="text-xs text-neutral-500">Período: {periodLabel}</p>
+          )}
+        </div>
+        <SubmitValidationButton
+          documentTypeId={documentTypeId}
+          documentTypeName={documentTypeName}
+          coveragePeriodStart={coveragePeriodStart}
+          onSubmitted={onSubmitted}
+        />
+      </div>
+      {submission?.status === "rejected" && submission.rejection_reason && (
+        <RejectionReasonBanner
+          reason={submission.rejection_reason}
+          rejectedAt={submission.rejected_at}
+        />
+      )}
+    </div>
+  );
+}
+
+type PendingSubmitSectionProps = {
+  monthly: MonthlyRequirement[];
+  oneTime: OneTimeRequirement[];
+  onSubmitted: () => void;
+};
+
+function PendingSubmitSection({ monthly, oneTime, onSubmitted }: PendingSubmitSectionProps) {
+  type SubmitCandidate = {
+    documentTypeId: number;
+    documentTypeName: string;
+    coveragePeriodStart: string | null;
+  };
+
+  const candidates: SubmitCandidate[] = [];
+
+  for (const req of monthly) {
+    for (const cell of req.cells) {
+      if (SUBMITTABLE.has(cell.status) && (cell.document_count ?? 0) > 0) {
+        candidates.push({
+          documentTypeId: req.document_type.id,
+          documentTypeName: req.document_type.name,
+          coveragePeriodStart: cell.coverage_period_start
+            ? String(cell.coverage_period_start)
+            : null,
+        });
+      }
+    }
+  }
+
+  for (const req of oneTime) {
+    if (SUBMITTABLE.has(req.status) && req.document_id != null) {
+      candidates.push({
+        documentTypeId: req.document_type.id,
+        documentTypeName: req.document_type.name,
+        coveragePeriodStart: null,
+      });
+    }
+  }
+
+  if (candidates.length === 0) return null;
+
+  return (
+    <section className="mb-6">
+      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-neutral-500">
+        Listos para enviar a validación
+      </h2>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {candidates.map((c) => (
+          <CellSubmitRow
+            key={`${c.documentTypeId}-${c.coveragePeriodStart ?? "none"}`}
+            documentTypeId={c.documentTypeId}
+            documentTypeName={c.documentTypeName}
+            coveragePeriodStart={c.coveragePeriodStart}
+            onSubmitted={onSubmitted}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
 // ─── PortalPage ──────────────────────────────────────────────────────────────
+
+type UploadParams = {
+  documentTypeId: number;
+  documentTypeName: string;
+  coveragePeriodStart: string | null;
+};
 
 export function PortalPage() {
   const [year, setYear] = useState(CURRENT_YEAR);
+  const [uploadParams, setUploadParams] = useState<UploadParams | null>(null);
+  const qc = useQueryClient();
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["portal-compliance", year],
@@ -136,6 +266,21 @@ export function PortalPage() {
     }
   }
 
+  function handleUploadClick({ document_type_id, coverage_period_start }: UploadClickParams) {
+    const name =
+      data?.monthly_requirements.find((r) => r.document_type.id === document_type_id)?.document_type.name ??
+      data?.one_time_requirements.find((r) => r.document_type.id === document_type_id)?.document_type.name ??
+      "Documento";
+    setUploadParams({ documentTypeId: document_type_id, documentTypeName: name, coveragePeriodStart: coverage_period_start });
+  }
+
+  function handleUploadClose(uploaded?: boolean) {
+    setUploadParams(null);
+    if (uploaded) {
+      qc.invalidateQueries({ queryKey: ["portal-compliance", year] });
+    }
+  }
+
   if (isLoading) return <p className="p-8 text-sm text-neutral-500">Cargando…</p>;
   if (isError || !data)
     return <p className="p-8 text-sm text-red-600">No fue posible cargar la información. Intenta de nuevo.</p>;
@@ -145,6 +290,7 @@ export function PortalPage() {
     data.monthly_requirements.length === 0 && data.one_time_requirements.length === 0;
 
   return (
+    <>
     <div className="mx-auto max-w-6xl p-8">
       {/* Header */}
       <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
@@ -200,19 +346,42 @@ export function PortalPage() {
                   Documentos periódicos
                 </h2>
               </div>
-              <ComplianceGridComponent data={data} readOnly />
+              <ComplianceGridComponent
+                data={data}
+                readOnly
+                portalMode
+                onUploadClick={handleUploadClick}
+              />
             </section>
           )}
+
+          {/* Envíos pendientes de validación */}
+          <PendingSubmitSection
+            monthly={data.monthly_requirements}
+            oneTime={data.one_time_requirements}
+            onSubmitted={() => qc.invalidateQueries({ queryKey: ["portal-compliance", year] })}
+          />
 
           {/* Documentos únicos */}
           {data.one_time_requirements.length > 0 && (
             <OneTimeRequirements
               items={data.one_time_requirements}
               onDocumentClick={handleDocumentClick}
+              onUploadClick={handleUploadClick}
             />
           )}
         </>
       )}
     </div>
+
+    {uploadParams && (
+      <UploadPortalDialog
+        documentTypeId={uploadParams.documentTypeId}
+        documentTypeName={uploadParams.documentTypeName}
+        coveragePeriodStart={uploadParams.coveragePeriodStart}
+        onClose={handleUploadClose}
+      />
+    )}
+    </>
   );
 }

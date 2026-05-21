@@ -4,14 +4,14 @@
 
 **Prerequisites**: plan.md ✅ · spec.md ✅ · research.md ✅ · data-model.md ✅ · contracts/ ✅
 
-**Tests**: Se incluyen los tests de autenticación y aislamiento de tenant porque son **obligatorios** según el Principio III de la Constitución (caminos críticos de auth e isolation deben tener pruebas antes del merge).
+**Tests**: Se incluyen los tests de autenticación, aislamiento de tenant, upload y submit porque son **obligatorios** según el Principio III de la Constitución (caminos críticos deben tener pruebas antes del merge).
 
 **Organization**: Tareas agrupadas por historia de usuario del spec para permitir implementación y prueba independiente.
 
 ## Format: `[ID] [P?] [Story] Description`
 
 - **[P]**: Se puede ejecutar en paralelo (archivos distintos, sin dependencias pendientes)
-- **[Story]**: Historia de usuario a la que pertenece la tarea (US1–US4 según spec.md)
+- **[Story]**: Historia de usuario a la que pertenece la tarea (US1–US6 según spec.md)
 
 ---
 
@@ -23,7 +23,7 @@
 
 ---
 
-## Phase 2: Foundational (Prerrequisitos bloqueantes)
+## Phase 2: Foundational Part 1 — Auth y modelos de usuarios (Prerrequisitos bloqueantes)
 
 **Purpose**: Cambios en BD y en la capa de sesión que bloquean TODAS las historias de usuario.
 
@@ -33,7 +33,22 @@
 - [X] T003 [P] Extender `backend/src/repse/users/models.py` — agregar `SUPPLIER = "supplier"` al enum `Role`; agregar campo `supplier_id: Mapped[int | None]` con FK a `suppliers.id` ON DELETE SET NULL e index=True
 - [X] T004 [P] Extender `backend/src/repse/auth/session.py` — agregar `supplier_id: int | None = None` a `SessionPayload`; actualizar `issue()` para incluir `"supplier_id": payload.supplier_id`; actualizar `read()` usando `.get("supplier_id")` (backward-compatible con cookies antiguas)
 
-**Checkpoint**: Migración lista y modelos actualizados — pueden comenzar todas las historias.
+**Checkpoint**: Migración 0005 lista y modelos actualizados — pueden comenzar todas las historias.
+
+---
+
+## Phase 2B: Foundational Part 2 — Modelos y migración de US5/US6 (Prerrequisitos para US5 y US6)
+
+**Purpose**: Crear la tabla `portal_submissions`, el modelo SQLAlchemy y los schemas Pydantic necesarios para las fases de carga y envío a validación.
+
+**⚠️ CRÍTICO**: Las fases US5 y US6 no pueden comenzar hasta que esta sección esté completa.
+
+- [X] T026 Crear migración `backend/alembic/versions/0006_add_portal_submissions.py` — CREATE TABLE portal_submissions con todos los campos del data-model.md (organization_id, supplier_id, document_type_id, coverage_period_start, submitted_at, submitted_by, status ENUM, rejection_reason, pre_submission_status ENUM, created_at, updated_at) e índice compuesto `idx_portal_submissions_lookup`
+- [X] T027 [P] Crear modelo SQLAlchemy `PortalSubmission` en `backend/src/repse/portal/models.py` — mapear todos los campos de `portal_submissions` incluyendo FKs a organizations, suppliers, document_types y users
+- [X] T028 [P] Crear schemas Pydantic del portal en `backend/src/repse/portal/schemas.py` — definir `SubmissionOut` (submission_id, supplier_id, document_type_id, coverage_period_start, submitted_at, status), `UploadOut` (id, document_type_id, coverage_period_start, coverage_period_end, status, file_name_original, file_size_bytes, version, created_at) y `SubmitRequest` (coverage_period_start: date | None)
+- [X] T029 Actualizar `backend/src/repse/compliance/service.py` — en `get_annual_compliance()` agregar query a `portal_submissions` para obtener celdas con `status='pending'`; retornar `CellStatus.SUBMITTED` para esas celdas (Decision 10 del research.md)
+
+**Checkpoint**: Modelo de datos de submissions listo — implementación de US5 y US6 puede comenzar.
 
 ---
 
@@ -69,7 +84,7 @@
 
 ## Phase 4: User Story 2 — Vista de estado actual por tipo de documento (Priority: P2)
 
-**Goal**: El proveedor abre el portal y ve el estado de cumplimiento de todos sus tipos de documento para el año actual, agrupados por tipo, con indicación visual del estado (vigente/próximo a vencer/vencido/pendiente).
+**Goal**: El proveedor abre el portal y ve el estado de cumplimiento de todos sus tipos de documento para el año actual, agrupados por tipo, con indicación visual del estado (vigente/próximo a vencer/vencido/pendiente/enviado).
 
 **Independent Test**: Usuario con rol supplier hace `GET /api/v1/portal/compliance` → responde 200 con `ComplianceGridOut`; en frontend abre `/portal` → ve la cuadrícula de estados sin hacer ninguna acción adicional.
 
@@ -84,13 +99,67 @@
 - [X] T017 [P] [US2] Crear `frontend/src/lib/api/portal.ts` — exportar `portalApi` con método `getCompliance(year?: number): Promise<ComplianceGridOut>` que llama `GET /api/v1/portal/compliance${year ? \`?year=${year}\` : ""}`; reutilizar `apiFetch` del módulo api existente
 - [X] T018 [US2] Actualizar `frontend/src/app/router.tsx` — importar `PortalPage` (nuevo); agregar `<Route path="portal" element={<PortalPage />} />`; cambiar el `<Navigate>` del índice raíz para que cuando `role === "supplier"` redirija a `/portal` y los demás a `/suppliers`; en `setUser` dentro de `RequireAuth` mapear `me.supplier_id` a `supplierId` en `AuthUser` (depende de T011, T017)
 - [X] T019 [US2] Actualizar `frontend/src/components/layout/AppShell.tsx` — para `user?.role === "supplier"` mostrar solo el ítem "Mi documentación" (enlace a `/portal`, icono `FileStack`) en la navegación; ocultar todos los ítems administrativos; mantener visibles nombre de organización, RFC y botón de logout (depende de T011)
-- [X] T020 [US2] Crear `frontend/src/pages/portal/index.tsx` — `PortalPage`: query `portalApi.getCompliance(selectedYear)` con TanStack Query; cabecera con nombre del proveedor, RFC, tipo de proveedor y `compliance_percent`; selector de año (rango 2020–año actual, default año en curso); para cada `monthly_requirement` mostrar fila con nombre del tipo y la fila de celdas usando el componente `ComplianceCell` existente; para `one_time_requirements` sección separada "Documentos únicos"; sin botones de acción (read-only) (depende de T017, T018, T019)
+- [X] T020 [US2] Crear `frontend/src/pages/portal/index.tsx` — `PortalPage`: query `portalApi.getCompliance(selectedYear)` con TanStack Query; cabecera con nombre del proveedor, RFC, tipo de proveedor y `compliance_percent`; selector de año (rango 2020–año actual, default año en curso); para cada `monthly_requirement` mostrar fila con nombre del tipo y la fila de celdas usando el componente `ComplianceCell` existente; para `one_time_requirements` sección separada "Documentos únicos" (depende de T017, T018, T019)
 
 **Checkpoint**: Usuario supplier ingresa al sistema, ve `/portal` con el grid de cumplimiento completo.
 
 ---
 
-## Phase 5: User Story 3 — Consulta del historial de documentos por tipo (Priority: P3)
+## Phase 5: User Story 5 — Carga de documentos faltantes o vencidos (Priority: P2)
+
+**Goal**: El proveedor puede cargar archivos para celdas en estado `missing`, `expired` o `pending` directamente desde el portal sin intervención del administrador.
+
+**Independent Test**: Proveedor con celda en estado "Faltante" selecciona esa celda, carga un archivo válido → estado de la celda se actualiza a `missing` con archivo en la misma sesión (< 3 s); intentar cargar en celda `submitted` retorna error explicativo.
+
+### Tests críticos (Constitución Principio III — obligatorios antes del merge)
+
+> **NOTA: Escribir estos tests ANTES de T030. Deben fallar hasta que la implementación esté completa.**
+
+- [X] T030 [P] [US5] Crear `backend/tests/test_portal_upload.py` — tests negativos: período futuro → 422 `future_period`; celda en estado `submitted` → 409 `upload_not_allowed`; celda en estado `validated` → 409 `upload_not_allowed`; celda en estado `expiring_soon` → 409 `upload_not_allowed`; límite de archivos alcanzado (`max_files`) → 409 `max_files_reached`; formato inválido → 422 `invalid_file_type`; tamaño excedido → 422 `file_too_large`; test positivo: celda `missing` + archivo válido → 201
+
+### Implementación backend
+
+- [X] T031 [US5] Implementar endpoint `POST /api/v1/portal/upload` en `backend/src/repse/portal/routes.py` — `Content-Type: multipart/form-data`; extrae `supplier_id` de la sesión; valida: `coverage_period_start` ≤ primer día del mes actual (422 `future_period`); estado de celda = `missing`/`expired`/`pending` (409 `upload_not_allowed`); cuenta de archivos < `document_type.max_files` (409 `max_files_reached`); formato y tamaño contra catálogo (422 `invalid_file_type` / `file_too_large`); llama al servicio de documentos existente con `supplier_id=session.supplier_id, organization_id=session.organization_id`; devuelve `UploadOut` 201 (depende de T027, T028, T029)
+
+### Implementación frontend
+
+- [X] T032 [P] [US5] Extender `frontend/src/lib/api/portal.ts` — agregar `portalApi.upload(file: File, documentTypeId: number, coveragePeriodStart?: string): Promise<UploadOut>` que llama `POST /api/v1/portal/upload` con `multipart/form-data`; manejar errores 409/422 devolviendo el `code` de error para mensajes descriptivos
+- [X] T033 [US5] Crear `frontend/src/components/portal/UploadPortalDialog.tsx` — dialog con: selector de archivo (drag & drop o click), validación de formato/tamaño en cliente antes de enviar, mensaje de error descriptivo cuando el estado de la celda bloquea la carga, feedback de progreso durante la subida, confirmación de éxito (depende de T032)
+- [X] T034 [US5] Integrar `UploadPortalDialog` en `frontend/src/pages/portal/index.tsx` — mostrar botón/icono de carga solo en celdas con estado `missing`, `expired` o `pending`; al confirmar carga exitosa invalidar la query `getCompliance` para que la vista se actualice en < 3 s (SC-008) (depende de T020, T033)
+
+**Checkpoint**: Proveedor puede cargar documentos desde el portal y el estado de la celda se actualiza visualmente.
+
+---
+
+## Phase 6: User Story 6 — Envío a validación por tipo de documento (Priority: P2)
+
+**Goal**: El proveedor puede enviar un paquete de documentos a revisión de contabilidad con un clic; el estado de la celda cambia a "Pendiente de validación" en < 3 s y el botón queda inhabilitado hasta que contabilidad procese la solicitud.
+
+**Independent Test**: Proveedor con al menos un archivo cargado presiona "Enviar a validar" → portal_submission creada con `status='pending'` → estado de celda cambia a `submitted` en frontend (< 3 s) → botón inhabilitado; proveedor no puede re-enviar sin acción de contabilidad.
+
+### Tests críticos (Constitución Principio III — obligatorios antes del merge)
+
+> **NOTA: Escribir estos tests ANTES de T036/T037. Deben fallar hasta que la implementación esté completa.**
+
+- [X] T035 [P] [US6] Crear `backend/tests/test_portal_submit.py` — tests negativos: ningún documento cargado en la celda → 409 `no_documents_uploaded`; ya existe submission pendiente → 409 `already_submitted`; celda en estado `validated` → 409 `cell_not_submittable`; celda en estado `expiring_soon` → 409 `cell_not_submittable`; test positivo: celda con documentos cargados → 201 con `SubmissionOut`; test GET submission: celda con rejection → devuelve `rejection_reason`; celda sin submission → devuelve null
+
+### Implementación backend
+
+- [X] T036 [US6] Implementar endpoint `POST /api/v1/portal/submit/{document_type_id}` en `backend/src/repse/portal/routes.py` — body: `SubmitRequest(coverage_period_start: date | None)`; valida: al menos 1 documento en la celda (409 `no_documents_uploaded`); no existe `portal_submission` con `status='pending'` para esa celda (409 `already_submitted`); estado de celda ≠ `validated`/`expiring_soon` (409 `cell_not_submittable`); crea `PortalSubmission(status='pending', submitted_at=utcnow(), pre_submission_status=current_status, submitted_by=user.user_id)`; devuelve `SubmissionOut` 201 (depende de T027, T028)
+- [X] T037 [P] [US6] Implementar endpoint `GET /api/v1/portal/submission/{document_type_id}` en `backend/src/repse/portal/routes.py` — query param `coverage_period_start`; devuelve la submission más reciente para esa celda con `submission_id`, `status`, `submitted_at`, `rejection_reason`, `rejected_at`; devuelve `null` si no existe submission previa (depende de T027, T028)
+
+### Implementación frontend
+
+- [X] T038 [P] [US6] Extender `frontend/src/lib/api/portal.ts` — agregar `portalApi.submit(documentTypeId: number, coveragePeriodStart: string | null): Promise<SubmissionOut>` que llama `POST /api/v1/portal/submit/{documentTypeId}`; agregar `portalApi.getSubmission(documentTypeId: number, coveragePeriodStart?: string): Promise<SubmissionDetail | null>` que llama `GET /api/v1/portal/submission/{documentTypeId}`
+- [X] T039 [US6] Crear `frontend/src/components/portal/SubmitValidationButton.tsx` — botón CTA con color de acción destacado (no gris/neutro); muestra diálogo de confirmación antes de enviar; inhabilita el botón tras envío exitoso (estado `submitted`); estado de carga durante la petición; visible solo cuando la celda tiene al menos 1 archivo y no hay submission pendiente (depende de T038)
+- [X] T040 [P] [US6] Crear `frontend/src/components/portal/RejectionReasonBanner.tsx` — banner visible cuando `portalApi.getSubmission()` devuelve `status='rejected'`; muestra el `rejection_reason` de contabilidad; usa color de advertencia/error; desaparece cuando el proveedor carga nuevamente (celda sale de estado rechazado) (depende de T038)
+- [X] T041 [US6] Integrar `SubmitValidationButton` y `RejectionReasonBanner` en `frontend/src/pages/portal/index.tsx` — botón visible en celdas que tienen archivos y no tienen submission pending; banner visible cuando la última submission fue rechazada; invalidar query `getCompliance` tras submit exitoso para actualizar estado a `submitted` en < 3 s (SC-010) (depende de T020, T039, T040)
+
+**Checkpoint**: Flujo completo upload → submit → estado `submitted` visible en portal; banner de rechazo visible tras rechazo de contabilidad.
+
+---
+
+## Phase 7: User Story 3 — Consulta del historial de documentos por tipo (Priority: P3)
 
 **Goal**: El proveedor puede seleccionar un tipo de documento y ver el historial completo de entregas: todas las versiones, períodos de vigencia y estados.
 
@@ -109,7 +178,7 @@
 
 ---
 
-## Phase 6: User Story 4 — Documentos próximos a vencer con acceso rápido (Priority: P4)
+## Phase 8: User Story 4 — Documentos próximos a vencer con acceso rápido (Priority: P4)
 
 **Goal**: El portal presenta una sección de alertas visible al entrar que lista los tipos de documento que vencen pronto o ya están vencidos, permitiendo acción rápida.
 
@@ -123,11 +192,13 @@
 
 ---
 
-## Phase 7: Polish & Validación cruzada
+## Phase 9: Polish & Validación cruzada
 
-**Purpose**: Verificación funcional del flujo completo.
+**Purpose**: Verificación funcional del flujo completo y validaciones de seguridad.
 
-- [ ] T025 [P] Validación manual end-to-end: crear usuario proveedor via UI admin → login como proveedor → verificar redirección a `/portal` → verificar que la nav solo muestra "Mi documentación" → verificar grid de cumplimiento → verificar historial de un tipo → verificar sección de alertas → verificar que intentar navegar a `/suppliers` redirige a `/portal`
+- [ ] T025 [P] Validación manual end-to-end: crear usuario proveedor via UI admin → login como proveedor → verificar redirección a `/portal` → verificar nav mínima → verificar grid de cumplimiento → cargar documento en celda `missing` → verificar actualización de estado → presionar "Enviar a validar" → verificar estado `submitted` → verificar historial → verificar alertas → verificar que navegar a `/suppliers` redirige a `/portal`
+- [ ] T042 [P] Verificar que ningún endpoint del portal acepta `supplier_id` como parámetro externo (query/body/path); revisar `backend/src/repse/portal/routes.py` contra el contrato en `specs/009-proveedor-portal-viewer/contracts/portal-compliance.md`
+- [ ] T043 [P] Verificar respuesta `GET /api/v1/portal/compliance` < 500 ms p95 con datos reales de un proveedor con 12 meses de histórico; agregar índices adicionales a `portal_submissions` si la query de submissions pending supera el umbral (SC-002)
 
 ---
 
@@ -136,69 +207,66 @@
 ### Phase Dependencies
 
 - **Phase 1 (Setup)**: Sin dependencias — comenzar de inmediato
-- **Phase 2 (Foundational)**: Depende de Phase 1 — **bloquea todas las historias**
-- **Phases 3–6 (User Stories)**: Dependen de Phase 2
-  - US1 → US2 → US3 → US4 deben seguir ese orden (cada una construye sobre la anterior)
-- **Phase 7 (Polish)**: Depende de todas las historias completadas
+- **Phase 2 (Foundational Part 1)**: Depende de Phase 1 — bloquea todas las historias
+- **Phase 2B (Foundational Part 2)**: Depende de Phase 2 — bloquea US5 y US6
+- **Phase 3 (US1)**: Depende de Phase 2
+- **Phase 4 (US2)**: Depende de Phase 2; puede ejecutarse en paralelo con US1
+- **Phase 5 (US5)**: Depende de Phase 2B y Phase 4 (PortalPage base debe existir para integración frontend)
+- **Phase 6 (US6)**: Depende de Phase 2B y Phase 5 (flujo upload → submit)
+- **Phase 7 (US3)**: Depende de Phase 4 (extiende portal/routes.py y PortalPage existentes)
+- **Phase 8 (US4)**: Depende de Phase 4 (usa datos del compliance grid)
+- **Phase 9 (Polish)**: Depende de todas las historias completadas
 
 ### User Story Dependencies
 
 - **US1 (P1)**: Puede comenzar después de Phase 2. Sin dependencias en otras historias.
 - **US2 (P2)**: Depende de US1 (el portal endpoint necesita `CurrentUser.supplier_id` de T008).
-- **US3 (P3)**: Depende de US2 (la página del portal T020 debe existir antes de extenderla).
-- **US4 (P4)**: Depende de US2 (igual, extiende T020).
+- **US5 (P2)**: Depende de Phase 2B y US2 (integración en PortalPage existente).
+- **US6 (P2)**: Depende de US5 (el flujo de envío supone que hay archivos cargados).
+- **US3 (P3)**: Depende de US2 (extiende portal/routes.py y PortalPage existentes).
+- **US4 (P4)**: Depende de US2 (usa el mismo compliance grid).
 
 ### Within Each User Story
 
-- Tests T005/T006: escribir ANTES de T009/T010; deben fallar hasta que la implementación esté lista
+- Tests: escribir ANTES de la implementación correspondiente; deben fallar hasta que esté completa
 - Modelos y schemas antes que routes
-- Backend antes que frontend en cada historia (el frontend necesita saber la forma del API)
-- Para US2–US4: completar backend primero, luego frontend
+- Backend antes que frontend en cada historia
+- Para US5/US6: completar backend primero, luego frontend
 
 ### Parallel Opportunities
 
-- T003 y T004 (foundational): archivos distintos, paralelos
-- T005, T006, T007, T008 (inicio de US1): todos en archivos distintos, paralelos
-- T011 y T012 (frontend types): archivos distintos, paralelos
-- T017 (portal.ts) con T018 (router.tsx) con T019 (AppShell): paralelos
-- T022 (portal.ts extensión) con T021 (backend history endpoint): paralelos
+- T026, T027, T028 (Phase 2B): archivos distintos, paralelos
+- T030, T032 (US5): tests y API client paralelos con T031 backend
+- T035, T037, T038, T040 (US6): paralelos entre sí
+- T039 (SubmitValidationButton) y T040 (RejectionReasonBanner): archivos distintos, paralelos
 
 ---
 
-## Parallel Example: User Story 1
+## Parallel Example: User Story 5
 
 ```text
-# Ejecutar en paralelo después de Phase 2:
-T005 — test_portal_auth.py (tests de auth gate)
-T006 — test_portal_isolation.py (test de aislamiento)
-T007 — users/schemas.py (supplier_id + validator)
-T008 — auth/dependencies.py (CurrentUser.supplier_id)
-T011 — frontend/lib/auth.tsx ("supplier" role)
-T012 — frontend/lib/api/index.ts (supplier_id types)
+# Ejecutar en paralelo después de Phase 2B completa:
+T030 — test_portal_upload.py (tests de upload)
+T032 — portal.ts upload method
+T031 — POST /upload endpoint (secuencial: requiere T030 fallando)
 
-# Después de T007 + T008:
-T009 — users/routes.py (validación supplier_id)
-T010 — auth/routes.py (login + /me + OIDC)
-
-# Después de T011 + T012:
-T013 — pages/users/list.tsx (CreateUserDialog supplier select)
+# Después de T031 + T032:
+T033 — UploadPortalDialog
+T034 — Integración en PortalPage
 ```
 
-## Parallel Example: User Story 2
+## Parallel Example: User Story 6
 
 ```text
-# Ejecutar en paralelo después de US1 completa:
-T017 — frontend/lib/api/portal.ts
-T014+T015+T016 — portal backend (secuencial entre sí)
+# Ejecutar en paralelo después de Phase 2B completa:
+T035 — test_portal_submit.py
+T037 — GET /submission endpoint
+T038 — portal.ts submit/getSubmission
+T039 — SubmitValidationButton
+T040 — RejectionReasonBanner
 
-# Después de T011 + T017:
-T018 — app/router.tsx
-
-# Después de T011:
-T019 — AppShell.tsx
-
-# Después de T017 + T018 + T019:
-T020 — pages/portal/index.tsx
+# T036 (POST /submit) requiere T035 fallando primero
+# T041 integración en PortalPage requiere T036 + T039 + T040
 ```
 
 ---
@@ -208,26 +276,41 @@ T020 — pages/portal/index.tsx
 ### MVP First (User Story 1 + 2)
 
 1. Completar Phase 1 + Phase 2 (Setup + Foundational)
-2. Completar Phase 3 (US1 — Creación de usuario proveedor)
-3. Completar Phase 4 (US2 — Vista de estado actual)
+2. Completar Phase 3 (US1 — Creación de usuario proveedor) — **YA COMPLETO** (excepto T005/T006)
+3. Completar Phase 4 (US2 — Vista de estado actual) — **YA COMPLETO**
 4. **STOP y VALIDAR**: el proveedor puede iniciar sesión y ver su portal con el grid de cumplimiento
-5. Demo/validación con stakeholders antes de continuar
 
 ### Incremental Delivery
 
-1. Setup + Foundational → Base de datos y sesión actualizadas
-2. US1 → Admin puede crear proveedores; proveedor puede hacer login → **MVP funcional**
-3. US2 → Proveedor ve su portal con estados → **Valor real para el proveedor**
-4. US3 → Proveedor puede revisar historial → **Transparencia de cumplimiento**
-5. US4 → Alertas destacadas → **Priorización de acción**
+1. Setup + Foundational → Base de datos y sesión actualizadas — **YA COMPLETO**
+2. T005/T006 → Tests de auth e aislamiento de tenant — **YA COMPLETO** (Constitución Principio III)
+3. US1 → Admin puede crear proveedores; proveedor puede hacer login — **YA COMPLETO**
+4. US2 → Proveedor ve su portal con estados — **YA COMPLETO**
+5. Phase 2B → Modelos para upload/submit — **YA COMPLETO**
+6. US5 → Proveedor carga documentos desde portal — **YA COMPLETO**
+7. US6 → Proveedor envía a validación — **YA COMPLETO**
+8. US3 → Proveedor revisa historial — **YA COMPLETO**
+9. US4 → Alertas destacadas — **YA COMPLETO**
+10. Phase 9 → Validación manual end-to-end — **PENDIENTE**
+
+### Parallel Team Strategy
+
+Con múltiples desarrolladores, una vez completada Phase 2B:
+- Dev A: US5 backend (POST /upload) + tests
+- Dev B: US6 backend (POST /submit + GET /submission) + tests
+- Dev C: US5/US6 frontend (UploadPortalDialog, SubmitValidationButton, RejectionReasonBanner)
 
 ---
 
 ## Notes
 
-- [P] = archivos distintos, sin dependencias pendientes entre sí
-- Los tests T005/T006 son OBLIGATORIOS (Constitution Principio III) — no son opcionales
+- **[P]** = archivos distintos, sin dependencias pendientes entre sí — ejecutables en paralelo
+- Los tests T030/T035 son **OBLIGATORIOS** (Constitution Principio III) — no son opcionales
+- Los tests T005/T006 (auth/aislamiento) son obligatorios — ya completados
 - Las cookies de sesión anteriores (sin `supplier_id`) son backward-compatible con `supplier_id=None`
-- La migración T002 requiere ALTER TABLE sobre el ENUM MySQL; usar `op.execute(text(...))` en Alembic ya que el proyecto usa `native_enum=False`
+- La migración T026 requiere `op.execute(text(...))` en Alembic para el CREATE TABLE completo (el proyecto usa MySQL 8)
+- `supplier_id` NUNCA se acepta como parámetro externo en ningún endpoint del portal; siempre de la sesión firmada
+- El aislamiento multi-tenant se aplica con `organization_id` en todas las queries de `portal_submissions`
+- La interfaz de contabilidad (aprobar/rechazar submissions) está **fuera del alcance** de esta feature; solo se entregan los datos y el endpoint de submit
 - `ComplianceCell` y `ComplianceBadge` existentes no necesitan modificaciones para el portal
-- No agregar endpoints POST/PATCH/DELETE al módulo `portal/` en esta iteración
+- Cuando contabilidad rechaza (feature separada), el `pre_submission_status` en `portal_submissions` indica a qué estado debe volver la celda

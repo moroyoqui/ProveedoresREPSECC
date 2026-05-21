@@ -13,7 +13,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Any
 
-from sqlalchemy import extract, func, select
+from sqlalchemy import extract, func, or_, select
 from sqlalchemy.orm import Session
 
 from repse.compliance.models import ComplianceCellValidation
@@ -27,6 +27,7 @@ from repse.compliance.schemas import (
     SupplierSummaryOut,
     SupplierTypeBrief,
 )
+from repse.portal.models import PortalSubmission, SubmissionStatus
 from repse.document_types.models import DocumentType, Periodicity
 from repse.documents.models import Document, DocumentStatus
 from repse.errors import NotFound
@@ -175,6 +176,27 @@ def get_annual_compliance(
         (int(r.document_type_id), int(r.m)): int(r.cnt) for r in count_rows
     }
 
+    # Load pending portal submissions for this supplier/year (Decision 10 — research.md).
+    # Cells with a pending submission display as SUBMITTED regardless of document state.
+    pending_submission_rows = db.execute(
+        select(
+            PortalSubmission.document_type_id,
+            PortalSubmission.coverage_period_start,
+        ).where(
+            PortalSubmission.organization_id == organization_id,
+            PortalSubmission.supplier_id == supplier_id,
+            PortalSubmission.status == SubmissionStatus.PENDING,
+            or_(
+                extract("year", PortalSubmission.coverage_period_start) == year,
+                PortalSubmission.coverage_period_start.is_(None),
+            ),
+        )
+    ).all()
+    pending_submissions: set[tuple[int, date | None]] = {
+        (int(r.document_type_id), r.coverage_period_start)
+        for r in pending_submission_rows
+    }
+
     # Load type-level validations for the supplier (bulk, one query).
     # Keys: (document_type_id, coverage_period_start) where period is a date or None.
     validation_rows = db.execute(
@@ -218,11 +240,13 @@ def get_annual_compliance(
 
         if periodicity == Periodicity.NONE:
             doc = docs_by_type_no_period.get(dt.id)
-            status = cell_status(doc, month=1, year=year, today=today)
+            raw_status = cell_status(doc, month=1, year=year, today=today)
+            is_pending = (dt.id, None) in pending_submissions
+            final_status = CellStatus.SUBMITTED if is_pending else raw_status
             one_time.append(
                 OneTimeRequirementOut(
                     document_type=brief,
-                    status=status,
+                    status=final_status,
                     document_id=doc.id if doc else None,
                     due_date_effective=doc.due_date_effective if doc else None,
                 )
@@ -246,14 +270,21 @@ def get_annual_compliance(
             doc = docs_by_type_and_month.get((dt.id, month))
             period_start = _coverage_start(month, year)
             is_type_validated = (dt.id, period_start) in validated_cells
+            is_pending = (dt.id, period_start) in pending_submissions
             raw_status = cell_status(
                 doc, month=month, year=year, today=today,
                 due_month_offset=due_offset,
             )
+            if is_type_validated:
+                final_status = CellStatus.VALIDATED
+            elif is_pending:
+                final_status = CellStatus.SUBMITTED
+            else:
+                final_status = raw_status
             cells.append(
                 CellOut(
                     month=month,
-                    status=CellStatus.VALIDATED if is_type_validated else raw_status,
+                    status=final_status,
                     document_id=doc.id if doc else None,
                     document_count=count_by_type_and_month.get((dt.id, month), 0),
                     coverage_period_start=period_start,

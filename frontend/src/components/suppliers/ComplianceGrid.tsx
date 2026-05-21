@@ -5,6 +5,8 @@ import { COMPLIANCE_LEGEND, ComplianceCell, type UploadClickParams, type ViewerC
 import { DocumentViewerModal } from "@/components/documents/DocumentViewerModal";
 import type { CellStatus } from "@/lib/api/index";
 
+const PORTAL_UPLOADABLE: ReadonlySet<CellStatus> = new Set(["missing", "pending", "expired"]);
+
 const MONTH_LABELS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 
 type ViewerState = ViewerClickParams & {
@@ -17,9 +19,10 @@ type ComplianceGridProps = {
   data: ComplianceGridData;
   readOnly?: boolean;
   onUploadClick?: (params: UploadClickParams) => void;
+  portalMode?: boolean;
 };
 
-export function ComplianceGrid({ data, readOnly = false, onUploadClick }: ComplianceGridProps) {
+export function ComplianceGrid({ data, readOnly = false, onUploadClick, portalMode = false }: ComplianceGridProps) {
   const [viewerState, setViewerState] = useState<ViewerState | null>(null);
   if (data.monthly_requirements.length === 0) {
     return (
@@ -119,8 +122,11 @@ export function ComplianceGrid({ data, readOnly = false, onUploadClick }: Compli
                                 ? String(cell.coverage_period_start)
                                 : null
                             }
-                            onViewerClick={(params) =>
-                              setViewerState({ ...params, documentTypeName: req.document_type.name, cellStatus: cell.status, typeValidated: cell.type_validated ?? false })
+                            onViewerClick={
+                              portalMode && PORTAL_UPLOADABLE.has(cell.status)
+                                ? undefined
+                                : (params) =>
+                                    setViewerState({ ...params, documentTypeName: req.document_type.name, cellStatus: cell.status, typeValidated: cell.type_validated ?? false })
                             }
                             onUploadClick={onUploadClick}
                           />
@@ -156,8 +162,11 @@ export function ComplianceGrid({ data, readOnly = false, onUploadClick }: Compli
                             ? String(cell.coverage_period_start)
                             : null
                         }
-                        onViewerClick={(params) =>
-                          setViewerState({ ...params, documentTypeName: req.document_type.name, cellStatus: cell.status, typeValidated: cell.type_validated ?? false })
+                        onViewerClick={
+                          portalMode && PORTAL_UPLOADABLE.has(cell.status)
+                            ? undefined
+                            : (params) =>
+                                setViewerState({ ...params, documentTypeName: req.document_type.name, cellStatus: cell.status, typeValidated: cell.type_validated ?? false })
                         }
                         onUploadClick={onUploadClick}
                       />

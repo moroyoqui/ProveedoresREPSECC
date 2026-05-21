@@ -27,15 +27,15 @@ export function AppRouter() {
         <Route path="/" element={<RequireAuth><AppShell /></RequireAuth>}>
           <Route index element={<RootRedirect />} />
           <Route path="portal" element={<PortalPage />} />
-          <Route path="suppliers" element={<SuppliersListPage />} />
-          <Route path="suppliers/new" element={<NewSupplierPage />} />
-          <Route path="suppliers/:id" element={<SupplierDetailPage />} />
-          <Route path="suppliers/:id/edit" element={<EditSupplierPage />} />
-          <Route path="documents" element={<DocumentsListPage />} />
-          <Route path="dashboard" element={<DashboardPage />} />
-          <Route path="users" element={<UsersListPage />} />
+          <Route path="suppliers" element={<RequireNonSupplier><SuppliersListPage /></RequireNonSupplier>} />
+          <Route path="suppliers/new" element={<RequireNonSupplier><NewSupplierPage /></RequireNonSupplier>} />
+          <Route path="suppliers/:id" element={<RequireNonSupplier><SupplierDetailPage /></RequireNonSupplier>} />
+          <Route path="suppliers/:id/edit" element={<RequireNonSupplier><EditSupplierPage /></RequireNonSupplier>} />
+          <Route path="documents" element={<RequireNonSupplier><DocumentsListPage /></RequireNonSupplier>} />
+          <Route path="dashboard" element={<RequireNonSupplier><DashboardPage /></RequireNonSupplier>} />
+          <Route path="users" element={<RequireNonSupplier><UsersListPage /></RequireNonSupplier>} />
           <Route path="settings" element={<Navigate to="/settings/catalogs" replace />} />
-          <Route path="settings/catalogs" element={<CatalogsHub />}>
+          <Route path="settings/catalogs" element={<RequireNonSupplier><CatalogsHub /></RequireNonSupplier>}>
             <Route path="document-types" element={<DocumentTypesPage />} />
             <Route path="supplier-types" element={<SupplierTypesPage />} />
             <Route path="supplier-types/:id" element={<SupplierTypeDetailPage />} />
@@ -50,6 +50,14 @@ export function AppRouter() {
 function RootRedirect() {
   const { user } = useAuth();
   return <Navigate to={user?.role === "supplier" ? "/portal" : "/suppliers"} replace />;
+}
+
+function RequireNonSupplier({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
+  if (user?.role === "supplier") {
+    return <Navigate to="/portal" replace />;
+  }
+  return <>{children}</>;
 }
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
