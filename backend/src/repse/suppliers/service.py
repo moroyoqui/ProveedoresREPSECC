@@ -14,6 +14,8 @@ from sqlalchemy.orm import Session
 from repse.audit import actions as audit_actions
 from repse.audit.service import AuditEvent, write_event
 from repse.errors import Conflict, NotFound, UnprocessableEntity, ValidationFailure
+from repse.giros.models import Giro
+from repse.sectors.models import Sector
 from repse.suppliers import type_change_service
 from repse.suppliers.models import Supplier, SupplierStatus
 from repse.suppliers.schemas import SupplierIn, SupplierPatch
@@ -22,6 +24,26 @@ from repse.supplier_types.models import (
     SupplierTypeOrigin,
     SupplierTypeStatus,
 )
+
+
+def _validate_sector_giro(
+    db: Session, *, sector_id: int | None, giro_id: int | None
+) -> None:
+    """Validates sector/giro coherence. Raises UnprocessableEntity on violations."""
+    if giro_id is not None and sector_id is None:
+        raise UnprocessableEntity(
+            "Se requiere sector_id cuando se proporciona giro_id.",
+            details={"code": "giro_requires_sector"},
+        )
+    if giro_id is not None and sector_id is not None:
+        giro = db.get(Giro, giro_id)
+        if giro is None:
+            raise NotFound("Giro not found")
+        if giro.sector_id != sector_id:
+            raise UnprocessableEntity(
+                "El giro no pertenece al sector indicado.",
+                details={"code": "giro_sector_mismatch"},
+            )
 
 
 def _resolve_supplier_type(db: Session, organization_id: int, supplier_type_id: int | None) -> SupplierType:
@@ -58,15 +80,20 @@ def create_supplier(
     if body.status_active_requires_contact():
         pass  # validation happens in schema if needed
 
+    _validate_sector_giro(db, sector_id=body.sector_id, giro_id=body.giro_id)
+
     supplier = Supplier(
         organization_id=organization_id,
         supplier_type_id=st.id,
+        sector_id=body.sector_id,
+        giro_id=body.giro_id,
         legal_name=body.legal_name,
         rfc=body.rfc,
         contact_name=body.contact_name,
         contact_email=body.contact_email,
         contact_phone=body.contact_phone,
         notes=body.notes,
+        repse_folio=body.repse_folio,
         status=SupplierStatus.ACTIVE,
     )
     db.add(supplier)
@@ -84,6 +111,8 @@ def create_supplier(
                 "rfc": supplier.rfc,
                 "legal_name": supplier.legal_name,
                 "supplier_type_id": supplier.supplier_type_id,
+                "sector_id": supplier.sector_id,
+                "giro_id": supplier.giro_id,
             },
         ),
     )
@@ -167,8 +196,25 @@ def update_supplier(
         supplier.contact_phone = body.contact_phone
     if body.notes is not None:
         supplier.notes = body.notes
+    if body.repse_folio is not None:
+        supplier.repse_folio = body.repse_folio
     if body.status is not None:
         supplier.status = body.status
+
+    # Sector/giro update: validate coherence, then apply.
+    # If sector_id changes and no new giro_id is provided, clear giro_id.
+    sector_changing = "sector_id" in body.model_fields_set
+    giro_changing = "giro_id" in body.model_fields_set
+    if sector_changing or giro_changing:
+        new_sector_id = body.sector_id if sector_changing else supplier.sector_id
+        if sector_changing and not giro_changing:
+            # sector changed without explicit giro → clear giro
+            new_giro_id = None
+        else:
+            new_giro_id = body.giro_id if giro_changing else supplier.giro_id
+        _validate_sector_giro(db, sector_id=new_sector_id, giro_id=new_giro_id)
+        supplier.sector_id = new_sector_id
+        supplier.giro_id = new_giro_id
 
     after = {
         "legal_name": supplier.legal_name,

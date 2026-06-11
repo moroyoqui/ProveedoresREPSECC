@@ -74,7 +74,7 @@ def _inject_tenant_filter(orm_execute_state) -> None:  # type: ignore[no-untyped
     """
     if _admin_scope.get():
         return
-    if not orm_execute_state.is_select and not orm_execute_state.is_update and not orm_execute_state.is_delete:
+    if not orm_execute_state.is_select:
         return
     if orm_execute_state.execution_options.get("skip_tenant_filter"):
         return

@@ -1,7 +1,12 @@
 """Local-disk file storage with signed, short-lived download tokens.
 
-Layout (research.md §5 spec 001):
-    {UPLOAD_ROOT}/{organization_id}/{supplier_id}/{document_id}/v{version}.{ext}
+Layout (research.md §5 spec 001 / spec 012):
+    {UPLOAD_ROOT}/{organization_id}/{supplier_id}/{document_id}/v{version}.{uuid4}.{ext}
+
+Each save generates a fresh UUID4 suffix that guarantees path uniqueness even
+across concurrent uploads with identical parameters.  Existing files stored
+without a UUID suffix remain accessible — callers always use the path returned
+by save() or stored in the Document record, never a reconstructed path.
 
 Tokens are JWS issued via itsdangerous; they encode {file_id, user_id,
 organization_id, exp} and have a 5-minute TTL by default. The download endpoint
@@ -12,6 +17,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import BinaryIO
@@ -55,7 +61,7 @@ class FileStore:
         stream: BinaryIO,
     ) -> StoredFile:
         ext = extension.lstrip(".").lower()
-        rel = f"{organization_id}/{supplier_id}/{document_id}/v{version}.{ext}"
+        rel = f"{organization_id}/{supplier_id}/{document_id}/v{version}.{uuid.uuid4()}.{ext}"
         path = self._abs_path(rel)
         path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
 

@@ -19,12 +19,13 @@ type ComplianceGridProps = {
   data: ComplianceGridData;
   readOnly?: boolean;
   onUploadClick?: (params: UploadClickParams) => void;
+  onViewerClose?: () => void;
   portalMode?: boolean;
   onSubmitted?: () => void;
   uploadFn?: (file: File, documentTypeId: number, coveragePeriodStart: string | null) => Promise<void>;
 };
 
-export function ComplianceGrid({ data, readOnly = false, onUploadClick, portalMode = false, onSubmitted, uploadFn }: ComplianceGridProps) {
+export function ComplianceGrid({ data, readOnly = false, onUploadClick, onViewerClose, portalMode = false, onSubmitted, uploadFn }: ComplianceGridProps) {
   const [viewerState, setViewerState] = useState<ViewerState | null>(null);
   if (data.monthly_requirements.length === 0) {
     return (
@@ -197,7 +198,7 @@ export function ComplianceGrid({ data, readOnly = false, onUploadClick, portalMo
           {...(portalMode && uploadFn
             ? { uploadFn: (file) => uploadFn(file, viewerState.document_type_id, viewerState.coverage_period_start) }
             : {})}
-          onClose={() => setViewerState(null)}
+          onClose={() => { setViewerState(null); onViewerClose?.(); }}
         />
       )}
     </div>

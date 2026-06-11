@@ -8,6 +8,9 @@ import { useAuth } from "@/lib/auth";
 import { LoginPage } from "@/pages/auth/login";
 import { CatalogsHub } from "@/pages/settings/catalogs/index";
 import { DocumentTypesPage } from "@/pages/settings/catalogs/document-types";
+import { GirosPage } from "@/pages/settings/catalogs/giros";
+import { OrganizationSettingsPage } from "@/pages/settings/catalogs/organization";
+import { SectorsPage } from "@/pages/settings/catalogs/sectors";
 import { SupplierTypeDetailPage } from "@/pages/settings/catalogs/supplier-type-detail";
 import { SupplierTypesPage } from "@/pages/settings/catalogs/supplier-types";
 import { DashboardPage } from "@/pages/dashboard/index";
@@ -34,11 +37,14 @@ export function AppRouter() {
           <Route path="documents" element={<RequireNonSupplier><DocumentsListPage /></RequireNonSupplier>} />
           <Route path="dashboard" element={<RequireNonSupplier><DashboardPage /></RequireNonSupplier>} />
           <Route path="users" element={<RequireNonSupplier><UsersListPage /></RequireNonSupplier>} />
-          <Route path="settings" element={<Navigate to="/settings/catalogs" replace />} />
+          <Route path="settings" element={<Navigate to="/settings/catalogs/organization" replace />} />
           <Route path="settings/catalogs" element={<RequireNonSupplier><CatalogsHub /></RequireNonSupplier>}>
+            <Route path="organization" element={<OrganizationSettingsPage />} />
             <Route path="document-types" element={<DocumentTypesPage />} />
             <Route path="supplier-types" element={<SupplierTypesPage />} />
             <Route path="supplier-types/:id" element={<SupplierTypeDetailPage />} />
+            <Route path="sectors" element={<SectorsPage />} />
+            <Route path="giros" element={<GirosPage />} />
           </Route>
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

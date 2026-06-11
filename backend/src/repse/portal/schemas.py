@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
+from repse.compliance.schemas import ComplianceGridOut
 from repse.documents.models import DocumentStatus
 from repse.portal.models import SubmissionStatus
 
@@ -43,3 +45,15 @@ class SubmissionDetail(BaseModel):
     submitted_at: datetime
     rejection_reason: str | None
     rejected_at: datetime | None
+
+
+class _CatalogBrief(BaseModel):
+    id: int
+    name: str
+
+
+class PortalComplianceGridOut(ComplianceGridOut):
+    """Extends ComplianceGridOut with supplier classification (sector/giro) and REPSE folio."""
+    sector: _CatalogBrief | None = None
+    giro: _CatalogBrief | None = None
+    repse_folio: str | None = None

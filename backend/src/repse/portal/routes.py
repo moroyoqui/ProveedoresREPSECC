@@ -18,8 +18,11 @@ from repse.db.tenant_filter import set_current_tenant
 from repse.documents.models import Document, DocumentStatus
 from repse.documents.service import ALLOWED_MIME_TYPES, UploadInput, upload_document
 from repse.errors import Conflict, UnprocessableEntity, ValidationFailure
+from repse.giros.models import Giro
 from repse.portal.models import PortalSubmission, PreSubmissionStatus, SubmissionStatus
-from repse.portal.schemas import SubmissionDetail, SubmissionOut, SubmitRequest, UploadOut
+from repse.portal.schemas import PortalComplianceGridOut, SubmissionDetail, SubmissionOut, SubmitRequest, UploadOut
+from repse.sectors.models import Sector
+from repse.suppliers.models import Supplier
 from repse.users.models import Role
 
 router = APIRouter()
@@ -32,12 +35,12 @@ def _current_year() -> int:
     return date.today().year
 
 
-@router.get("/compliance", response_model=ComplianceGridOut)
+@router.get("/compliance", response_model=PortalComplianceGridOut)
 def portal_compliance(
     year: int | None = Query(None),
     user: CurrentUser = Depends(require_role(Role.SUPPLIER.value)),
     db: Session = Depends(get_db),
-) -> ComplianceGridOut:
+) -> PortalComplianceGridOut:
     if user.supplier_id is None:
         raise Conflict(
             "User has no linked supplier",
@@ -49,12 +52,32 @@ def portal_compliance(
             f"Year must be between {_MIN_YEAR} and {_current_year()}"
         )
     set_current_tenant(user.organization_id)
-    return get_annual_compliance(
+    compliance = get_annual_compliance(
         db,
         supplier_id=user.supplier_id,
         organization_id=user.organization_id,
         year=effective_year,
         portal_mode=True,
+    )
+    supplier = db.get(Supplier, user.supplier_id)
+    sector_out = None
+    giro_out = None
+    repse_folio = None
+    if supplier is not None:
+        repse_folio = supplier.repse_folio
+        if supplier.sector_id is not None:
+            sec = db.get(Sector, supplier.sector_id)
+            if sec is not None:
+                sector_out = {"id": sec.id, "name": sec.name}
+        if supplier.giro_id is not None:
+            gir = db.get(Giro, supplier.giro_id)
+            if gir is not None:
+                giro_out = {"id": gir.id, "name": gir.name}
+    return PortalComplianceGridOut(
+        **compliance.model_dump(),
+        sector=sector_out,
+        giro=giro_out,
+        repse_folio=repse_folio,
     )
 
 

@@ -27,7 +27,9 @@ from repse.compliance.routes import router as compliance_router
 from repse.documents.jobs import schedule_daily_recalculation
 from repse.documents.routes import router as documents_router
 from repse.document_types.routes import router as document_types_router
+from repse.giros.routes import router as giros_router
 from repse.organizations.routes import router as organizations_router
+from repse.sectors.routes import router as sectors_router
 from repse.suppliers.routes import router as suppliers_router
 from repse.supplier_types.routes import (
     requirements_router as supplier_type_requirements_router,
@@ -112,6 +114,8 @@ app.include_router(users_router, prefix=f"{API_PREFIX}/users", tags=["users"])
 app.include_router(supplier_types_router, prefix=f"{API_PREFIX}/supplier-types", tags=["supplier-types"])
 app.include_router(supplier_type_requirements_router, prefix=f"{API_PREFIX}/supplier-type-requirements", tags=["supplier-type-requirements"])
 app.include_router(document_types_router, prefix=f"{API_PREFIX}/document-types", tags=["document-types"])
+app.include_router(sectors_router, prefix=f"{API_PREFIX}/sectors", tags=["sectors"])
+app.include_router(giros_router, prefix=f"{API_PREFIX}/giros", tags=["giros"])
 app.include_router(suppliers_router, prefix=f"{API_PREFIX}/suppliers", tags=["suppliers"])
 app.include_router(documents_router, prefix=f"{API_PREFIX}", tags=["documents"])
 app.include_router(compliance_router, prefix=f"{API_PREFIX}", tags=["compliance"])

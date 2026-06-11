@@ -172,6 +172,23 @@ export function PortalPage() {
           <p className="mt-1 text-sm text-neutral-600">
             Tipo: <span className="font-medium">{data.supplier.supplier_type.name}</span>
           </p>
+          <p className="mt-0.5 text-sm text-neutral-600">
+            Sector:{" "}
+            <span className="font-medium">
+              {data.sector ? data.sector.name : <span className="italic text-neutral-400">Sin clasificar</span>}
+            </span>
+            {data.giro && (
+              <>
+                {" · "}Giro: <span className="font-medium">{data.giro.name}</span>
+              </>
+            )}
+          </p>
+          {data.repse_folio && (
+            <p className="mt-0.5 text-sm text-neutral-600">
+              Folio REPSE:{" "}
+              <span className="font-mono font-medium">{data.repse_folio}</span>
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <label className="text-sm font-medium text-neutral-600">Año:</label>

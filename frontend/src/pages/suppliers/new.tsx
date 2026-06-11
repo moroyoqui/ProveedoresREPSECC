@@ -6,14 +6,17 @@ import { z } from "zod";
 import { suppliersApi, supplierTypesApi } from "@/lib/api/index";
 import { Button, Card, CardBody, CardHeader, CardTitle, FormField } from "@/components/ui";
 import { ApiError } from "@/lib/api";
+import { sectorsApi } from "@/lib/api/sectors";
+import { girosApi } from "@/lib/api/giros";
 
 const schema = z.object({
   legal_name: z.string().min(3, "Mínimo 3 caracteres").max(255),
   rfc: z.string().regex(/^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/i, "RFC inválido"),
   supplier_type_id: z.coerce.number().optional(),
-  contact_name: z.string().max(255).optional(),
+  contact_name: z.string().max(120).optional(),
   contact_email: z.string().email("Correo inválido").optional().or(z.literal("")),
   contact_phone: z.string().max(32).optional(),
+  repse_folio: z.string().max(60).optional(),
 });
 
 export function NewSupplierPage() {
@@ -21,11 +24,26 @@ export function NewSupplierPage() {
   const qc = useQueryClient();
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [topError, setTopError] = useState<string | null>(null);
+  const [selectedSectorId, setSelectedSectorId] = useState<number | null>(null);
+  const [selectedGiroId, setSelectedGiroId] = useState<number | null>(null);
 
   const { data: typesData } = useQuery({
     queryKey: ["supplier-types"],
     queryFn: () => supplierTypesApi.list(),
   });
+
+  const { data: sectors = [] } = useQuery({
+    queryKey: ["sectors"],
+    queryFn: sectorsApi.list,
+  });
+
+  const { data: giros = [] } = useQuery({
+    queryKey: ["giros", selectedSectorId],
+    queryFn: () => girosApi.list(selectedSectorId ?? undefined),
+    enabled: selectedSectorId != null,
+  });
+
+  const filteredGiros = selectedSectorId != null ? giros : [];
 
   const createMut = useMutation({
     mutationFn: suppliersApi.create,
@@ -56,6 +74,7 @@ export function NewSupplierPage() {
       contact_name: fd.get("contact_name"),
       contact_email: fd.get("contact_email"),
       contact_phone: fd.get("contact_phone"),
+      repse_folio: fd.get("repse_folio"),
     });
     if (!parsed.success) {
       const fieldErrors: Record<string, string> = {};
@@ -71,6 +90,9 @@ export function NewSupplierPage() {
     const payload = {
       ...parsed.data,
       contact_email: parsed.data.contact_email || undefined,
+      repse_folio: parsed.data.repse_folio || undefined,
+      sector_id: selectedSectorId ?? undefined,
+      giro_id: selectedGiroId ?? undefined,
     };
     createMut.mutate(payload);
   }
@@ -127,9 +149,57 @@ export function NewSupplierPage() {
                 ))}
               </select>
             </div>
-            <FormField name="contact_name" label="Contacto" placeholder="Juan Pérez" />
+            {/* Sector / Giro selectors */}
+            <div>
+              <label className="text-sm font-medium text-brand-700" htmlFor="sector_id">
+                Sector (opcional)
+              </label>
+              <select
+                id="sector_id"
+                className="mt-1.5 h-10 w-full rounded-md border border-neutral-300 bg-white px-3 text-sm"
+                value={selectedSectorId ?? ""}
+                onChange={(e) => {
+                  const v = e.target.value ? Number(e.target.value) : null;
+                  setSelectedSectorId(v);
+                  setSelectedGiroId(null);
+                }}
+                disabled={sectors.length === 0}
+              >
+                <option value="">
+                  {sectors.length === 0 ? "Sin sectores disponibles — crea uno primero" : "Sin clasificar"}
+                </option>
+                {sectors.map((s) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-brand-700" htmlFor="giro_id">
+                Giro (opcional)
+              </label>
+              <select
+                id="giro_id"
+                className="mt-1.5 h-10 w-full rounded-md border border-neutral-300 bg-white px-3 text-sm"
+                value={selectedGiroId ?? ""}
+                onChange={(e) => setSelectedGiroId(e.target.value ? Number(e.target.value) : null)}
+                disabled={selectedSectorId == null || filteredGiros.length === 0}
+              >
+                <option value="">
+                  {selectedSectorId == null
+                    ? "Selecciona un sector primero"
+                    : filteredGiros.length === 0
+                    ? "Sin giros en este sector"
+                    : "Sin giro específico"}
+                </option>
+                {filteredGiros.map((g) => (
+                  <option key={g.id} value={g.id}>{g.name}</option>
+                ))}
+              </select>
+            </div>
+            <FormField name="contact_name" label="Nombre de contacto" placeholder="Juan Pérez" />
             <FormField name="contact_email" type="email" label="Correo de contacto" error={errors.contact_email} />
-            <FormField name="contact_phone" label="Teléfono" placeholder="+52 81 1234 5678" />
+            <FormField name="contact_phone" label="Teléfono de contacto" placeholder="+52 81 1234 5678" />
+            <FormField name="repse_folio" label="Folio REPSE" placeholder="REPSE-2024-00001234" />
             <div className="flex justify-end gap-3 pt-2">
               <Link to="/suppliers">
                 <Button type="button" variant="ghost">

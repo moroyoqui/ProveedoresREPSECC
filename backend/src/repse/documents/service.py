@@ -113,6 +113,9 @@ def upload_document(
     existing_doc = db.execute(
         select(Document).where(
             Document.organization_id == organization_id,
+            Document.supplier_id == body.supplier_id,
+            Document.document_type_id == body.document_type_id,
+            Document.coverage_period_start == body.coverage_period_start,
             Document.file_sha256 == sha256,
             Document.deleted_at.is_(None),
         )

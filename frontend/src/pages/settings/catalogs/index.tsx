@@ -3,8 +3,11 @@ import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 
 const TABS = [
+  { to: "organization", label: "Organización" },
   { to: "document-types", label: "Tipos de documento" },
   { to: "supplier-types", label: "Tipos de proveedor" },
+  { to: "sectors", label: "Sectores" },
+  { to: "giros", label: "Giros" },
 ];
 
 export function CatalogsHub() {
@@ -29,7 +32,7 @@ export function CatalogsHub() {
         <p className="text-xs uppercase tracking-widest text-neutral-500">Configuración</p>
         <h1 className="text-2xl font-semibold text-brand-700">Catálogos</h1>
         <p className="mt-1 text-sm text-neutral-600">
-          Define qué tipos de documento aplican a tu operación y qué tipos de proveedor existen.
+          Administra los datos de tu organización y los catálogos de documentos y proveedores.
         </p>
       </header>
 
@@ -53,10 +56,13 @@ export function CatalogsHub() {
 
       {isRoot ? (
         <div className="text-sm text-neutral-600">
-          Selecciona <Link to="document-types" className="text-brand-500 hover:underline">Tipos de documento</Link>{" "}
+          Selecciona una sección:{" "}
+          <Link to="organization" className="text-brand-500 hover:underline">Organización</Link>,{" "}
+          <Link to="document-types" className="text-brand-500 hover:underline">Tipos de documento</Link>,{" "}
+          <Link to="supplier-types" className="text-brand-500 hover:underline">Tipos de proveedor</Link>,{" "}
+          <Link to="sectors" className="text-brand-500 hover:underline">Sectores</Link>{" "}
           o{" "}
-          <Link to="supplier-types" className="text-brand-500 hover:underline">Tipos de proveedor</Link>{" "}
-          para empezar.
+          <Link to="giros" className="text-brand-500 hover:underline">Giros</Link>.
         </div>
       ) : (
         <Outlet />

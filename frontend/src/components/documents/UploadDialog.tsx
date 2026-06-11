@@ -1,6 +1,6 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { CheckCircle, XCircle, Loader2, RefreshCcw } from "lucide-react";
+import { CheckCircle, XCircle, Loader2, RefreshCcw, X } from "lucide-react";
 
 import { Button, Card, CardBody, CardHeader, CardTitle, FormField } from "@/components/ui";
 import { ApiError } from "@/lib/api";
@@ -48,9 +48,8 @@ export function UploadDialog({
   supplierId: number;
   initialDocTypeId?: number | null;
   initialCoverage?: string | null;
-  onClose: (uploaded?: boolean) => void;
+  onClose: () => void;
 }) {
-  const qc = useQueryClient();
   const [files, setFiles] = useState<FileItem[]>([]);
   const [docTypeId, setDocTypeId] = useState<number | null>(initialDocTypeId ?? null);
   const [coverage, setCoverage] = useState<string>(initialCoverage ?? "");
@@ -103,6 +102,7 @@ export function UploadDialog({
     setGlobalError(null);
     setIsUploading(true);
     let anySuccess = false;
+    let anyServerError = false;
 
     for (const item of uploadable) {
       setFiles((prev) =>
@@ -122,6 +122,7 @@ export function UploadDialog({
         );
         anySuccess = true;
       } catch (e: unknown) {
+        anyServerError = true;
         let msg = "Error inesperado";
         if (e instanceof ApiError) {
           msg = e.code === "duplicate_file" ? "Archivo duplicado (ya existe)." : e.message;
@@ -134,18 +135,10 @@ export function UploadDialog({
 
     setIsUploading(false);
 
-    if (anySuccess) {
-      qc.invalidateQueries({ queryKey: ["supplier", supplierId] });
-      qc.invalidateQueries({ queryKey: ["supplier-compliance", supplierId] });
+    if (anySuccess && !anyServerError) {
+      onClose();
     }
-
-    const allDone = files.every((f) => f.status === "success" || (f.status !== "idle" && f.status !== "uploading"));
-    const hasFailed = files.some((f) => f.status === "error");
-
-    if (anySuccess && !hasFailed) {
-      onClose(true);
-    }
-    // If there are failures, stay open so the user can see the summary / retry
+    // Si hubo errores de servidor, el diálogo queda abierto para que el usuario vea y reintente.
   }
 
   const successCount = files.filter((f) => f.status === "success").length;
@@ -159,8 +152,17 @@ export function UploadDialog({
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-brand-900/40 p-4">
       <Card className="w-full max-w-lg">
-        <CardHeader>
+        <CardHeader className="flex items-center justify-between">
           <CardTitle>Subir documento</CardTitle>
+          <button
+            type="button"
+            onClick={() => onClose()}
+            disabled={isUploading}
+            className="rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 disabled:opacity-40"
+            aria-label="Cerrar"
+          >
+            <X size={18} />
+          </button>
         </CardHeader>
         <CardBody>
           {globalError && (
@@ -269,7 +271,7 @@ export function UploadDialog({
                   Reintentar fallidos
                 </Button>
               )}
-              <Button type="button" variant="ghost" onClick={() => onClose(hasAtLeastOneSuccess)} disabled={isUploading}>
+              <Button type="button" variant="ghost" onClick={() => onClose()} disabled={isUploading}>
                 {hasAtLeastOneSuccess ? "Cerrar" : "Cancelar"}
               </Button>
               <Button
