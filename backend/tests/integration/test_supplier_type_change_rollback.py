@@ -118,7 +118,13 @@ def test_rollback_when_file_delete_fails(
 
     monkeypatch.setattr(FileStore, "delete", flaky_delete)
 
-    res = client_with_session.patch(
+    # El RuntimeError del servicio debe traducirse en respuesta 5xx, no
+    # propagarse al test: cliente local sin raise_server_exceptions.
+    from fastapi.testclient import TestClient
+
+    no_raise_client = TestClient(client_with_session.app, raise_server_exceptions=False)
+    no_raise_client.cookies = client_with_session.cookies
+    res = no_raise_client.patch(
         f"/api/v1/suppliers/{seeded_supplier.id}",
         json={"supplier_type_id": target_type.id, "confirmation_text": "eliminar"},
     )

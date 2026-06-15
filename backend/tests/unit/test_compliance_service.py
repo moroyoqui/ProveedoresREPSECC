@@ -31,9 +31,11 @@ def _doc(*, verified: bool = False, status: str = "valid"):
 # ---------------------------------------------------------------------------
 
 
-def test_cell_status_validated() -> None:
+def test_cell_status_verified_doc_is_submitted() -> None:
+    """`verified` ya no se evalúa en cell_status: VALIDATED se deriva de
+    ComplianceCellValidation en get_annual_compliance, no del documento."""
     doc = _doc(verified=True, status="valid")
-    assert cell_status(doc, month=4, year=2026, today=date(2026, 5, 18)) == CellStatus.VALIDATED
+    assert cell_status(doc, month=4, year=2026, today=date(2026, 5, 18)) == CellStatus.SUBMITTED
 
 
 def test_cell_status_submitted_when_unverified() -> None:

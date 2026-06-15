@@ -28,6 +28,8 @@ from repse.supplier_types.models import (
     SupplierTypeDocumentRequirement,
 )
 
+# Tipos permitidos para carga de archivos. Importado también por portal/routes_write.py.
+# Debe mantenerse sincronizado con UPLOAD_MIME_TYPES en frontend/src/lib/uploadConstraints.ts.
 ALLOWED_MIME_TYPES = {
     "application/pdf",
     "image/png",

@@ -20,9 +20,14 @@ import pytest
 
 
 @pytest.fixture()
-def app_small_upload(engine, monkeypatch):
+def app_small_upload(engine, connection, monkeypatch):
     """App fixture with upload_max_bytes=1 for the file_too_large test."""
     from repse import config as cfg_mod
+
+    # Capture the original function BEFORE the monkeypatch so the dependency
+    # override below is keyed by the exact callable the routes captured at
+    # import time.
+    real_get_settings = cfg_mod.get_settings
 
     settings = cfg_mod.Settings(
         app_secret="x" * 32,
@@ -37,11 +42,19 @@ def app_small_upload(engine, monkeypatch):
     from sqlalchemy.orm import sessionmaker
 
     db_session_mod._engine = engine
-    db_session_mod._SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
+    db_session_mod._SessionLocal = sessionmaker(
+        bind=connection,
+        expire_on_commit=False,
+        join_transaction_mode="create_savepoint",
+    )
 
     from repse.main import app
 
-    return app
+    # Depends(get_settings) captured the original function at import time, so
+    # monkeypatching the module attribute is not enough for route dependencies.
+    app.dependency_overrides[real_get_settings] = lambda: settings
+    yield app
+    app.dependency_overrides.pop(real_get_settings, None)
 
 
 # ---------------------------------------------------------------------------
@@ -159,12 +172,14 @@ def test_upload_rejects_future_period(app, db_session, session_user):
     doc_type = _get_monthly_doc_type(db_session, session_user)
     assert doc_type is not None
 
+    today = date.today()
+    next_month = date(today.year + 1, 1, 1) if today.month == 12 else date(today.year, today.month + 1, 1)
     resp = client.post(
         "/api/v1/portal/upload",
         files={"file": ("test.pdf", io.BytesIO(_VALID_PDF), "application/pdf")},
         data={
             "document_type_id": str(doc_type.id),
-            "coverage_period_start": "2026-06-01",  # June 2026 — future
+            "coverage_period_start": next_month.isoformat(),
         },
     )
     assert resp.status_code == 422
@@ -297,7 +312,7 @@ def test_upload_rejects_when_max_files_reached(app, db_session, session_user):
     """Document count at the per-cell limit → 409 max_files_reached."""
     from repse.db.tenant_filter import set_current_tenant, with_admin_scope
     from repse.documents.models import Document, DocumentStatus, OcrStatus
-    from repse.portal.routes import _MAX_FILES_PER_CELL
+    from repse.portal.routes_write import _MAX_FILES_PER_CELL
 
     client, user, supplier = _make_supplier_and_client(app, db_session, session_user)
     doc_type = _get_monthly_doc_type(db_session, session_user)
@@ -361,20 +376,9 @@ def test_upload_rejects_invalid_file_type(app, db_session, session_user):
 
 
 @pytest.mark.integration
-def test_upload_rejects_oversized_file(app, db_session, session_user, monkeypatch):
+def test_upload_rejects_oversized_file(app_small_upload, db_session, session_user):
     """File exceeding upload_max_bytes → 422 file_too_large."""
-    from repse import config as cfg_mod
-
-    tiny_settings = cfg_mod.Settings(
-        app_secret="x" * 32,
-        db_pass="x",
-        app_base_url="http://testserver",
-        upload_root=os.path.abspath("./var/test-uploads"),
-        upload_max_bytes=1,
-    )
-    monkeypatch.setattr(cfg_mod, "get_settings", lambda: tiny_settings)
-
-    client, _, _ = _make_supplier_and_client(app, db_session, session_user)
+    client, _, _ = _make_supplier_and_client(app_small_upload, db_session, session_user)
     doc_type = _get_monthly_doc_type(db_session, session_user)
     assert doc_type is not None
 
@@ -416,7 +420,7 @@ def test_upload_ok_missing_cell(app, db_session, session_user):
         created_at=datetime(2026, 1, 20, 10, 0, 0),
     )
 
-    with patch("repse.portal.routes.upload_document", return_value=fake_doc):
+    with patch("repse.portal.routes_write.upload_document", return_value=fake_doc):
         resp = client.post(
             "/api/v1/portal/upload",
             files={"file": ("test.pdf", io.BytesIO(_VALID_PDF), "application/pdf")},

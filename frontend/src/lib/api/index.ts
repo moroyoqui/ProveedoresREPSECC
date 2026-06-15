@@ -69,6 +69,7 @@ export type UserItem = {
   role: Role;
   status: UserStatus;
   supplier_id?: number | null;
+  supplier_name?: string | null;
   last_login_at: string | null;
 };
 
@@ -85,6 +86,7 @@ export type UserPatch = {
   role?: Role;
   status?: UserStatus;
   password?: string;
+  supplier_id?: number | null;
 };
 
 export const usersApi = {
@@ -365,6 +367,7 @@ export type DocumentOut = {
   coverage_period_end: string | null;
   due_date_calculated: string | null;
   due_date_effective: string | null;
+  due_date_override_reason?: string | null;
   status: "valid" | "expiring_soon" | "expired";
   verified: boolean;
   version: number;

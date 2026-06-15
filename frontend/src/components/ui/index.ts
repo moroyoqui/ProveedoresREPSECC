@@ -9,6 +9,8 @@ export type {
   DestructiveConfirmItem,
 } from "./DestructiveConfirmDialog";
 export { FormField } from "./FormField";
+export { IconButton } from "./IconButton";
+export type { IconButtonProps } from "./IconButton";
 export type { FormFieldProps } from "./FormField";
 export { Table, TBody, TD, TH, THead, TR } from "./Table";
 export { cn } from "./cn";

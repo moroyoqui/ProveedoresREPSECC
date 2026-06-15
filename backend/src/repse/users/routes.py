@@ -22,9 +22,16 @@ def list_users(
     user: CurrentUser = Depends(current_user),
     db: Session = Depends(get_db),
 ) -> dict:
-    rows = db.execute(select(User).order_by(User.email)).scalars().all()
+    rows = db.execute(
+        select(User, Supplier.legal_name.label("supplier_name"))
+        .outerjoin(Supplier, User.supplier_id == Supplier.id)
+        .order_by(User.email)
+    ).all()
     return {
-        "items": [UserOut.model_validate(u).model_dump() for u in rows],
+        "items": [
+            {**UserOut.model_validate(u).model_dump(), "supplier_name": sname}
+            for u, sname in rows
+        ],
         "next_cursor": None,
         "has_more": False,
     }

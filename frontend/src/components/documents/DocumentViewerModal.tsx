@@ -1,24 +1,27 @@
+/**
+ * Visualizador de documentos del back-office.
+ * Solo usa la API de admin — no importa ningún módulo del portal.
+ */
+
 import { useEffect, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Download, X, RefreshCcw, FileText, Plus, Loader2, CheckCircle, XCircle, ShieldCheck, Upload } from "lucide-react";
+import {
+  ChevronLeft, ChevronRight, Download, X, RefreshCcw,
+  FileText, Plus, Loader2, CheckCircle, XCircle, ShieldCheck, Upload,
+} from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 
 import { ApiError } from "@/lib/api";
 import { documentsApi } from "@/lib/api/index";
-import { useDocumentsList, validateDocumentType } from "@/lib/api/documents";
+import { fetchDocumentsList, validateDocumentType } from "@/lib/api/documents";
 import { Button } from "@/components/ui";
-import { SubmitValidationButton } from "@/components/portal/SubmitValidationButton";
-
-const ADD_ALLOWED_MIME_TYPES = new Set([
-  "application/pdf",
-  "image/png",
-  "image/jpeg",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-]);
-const ADD_MAX_FILE_BYTES = 20 * 1024 * 1024;
+import { UPLOAD_ACCEPT, validateUploadFile } from "@/lib/uploadConstraints";
 
 type AddFileStatus = "idle" | "uploading" | "success" | "error";
 type AddFileItem = { file: File; status: AddFileStatus; error?: string };
 
-const PREVIEW_MIME_TYPES = new Set(["application/pdf", "image/png", "image/jpeg", "image/gif", "image/webp"]);
+const PREVIEW_MIME_TYPES = new Set([
+  "application/pdf", "image/png", "image/jpeg", "image/gif", "image/webp",
+]);
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -45,8 +48,6 @@ export type DocumentViewerParams = {
   typeValidated?: boolean;
   canValidateType?: boolean;
   onAddMore?: () => void;
-  canSubmit?: boolean;
-  onSubmitted?: () => void;
   uploadFn?: (file: File) => Promise<void>;
 };
 
@@ -61,8 +62,6 @@ export function DocumentViewerModal({
   typeValidated = false,
   canValidateType = false,
   onAddMore,
-  canSubmit = false,
-  onSubmitted,
   uploadFn,
   onClose,
 }: DocumentViewerParams & { onClose: () => void }) {
@@ -77,25 +76,29 @@ export function DocumentViewerModal({
   const [validating, setValidating] = useState(false);
   const [validateError, setValidateError] = useState<string | null>(null);
 
-  const { data, isLoading, isError, refetch } = useDocumentsList({
-    supplier_id: supplierId,
-    document_type_id: documentTypeId,
-    coverage_period_start: coveragePeriodStart ?? undefined,
-    is_latest: false,
-    limit: 50,
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ["documents-list", "admin", supplierId, documentTypeId, coveragePeriodStart],
+    queryFn: () =>
+      fetchDocumentsList({
+        supplier_id: supplierId,
+        document_type_id: documentTypeId,
+        coverage_period_start: coveragePeriodStart ?? undefined,
+        is_latest: false,
+        limit: 50,
+      }),
+    placeholderData: (prev) => prev,
+    staleTime: 30_000,
   });
 
   const docs = data?.items ?? [];
   const selectedDoc = docs[selectedIdx] ?? null;
 
-  // Revoke all blob URLs on unmount to avoid memory leaks
   useEffect(() => {
     return () => {
       Object.values(blobUrlsRef.current).forEach((url) => URL.revokeObjectURL(url));
     };
   }, []);
 
-  // Fetch file as blob when selected document changes (avoids X-Frame-Options / auth issues)
   useEffect(() => {
     if (!selectedDoc) return;
     if (blobUrlCache[selectedDoc.id]) return;
@@ -122,12 +125,9 @@ export function DocumentViewerModal({
       }
     })();
 
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [selectedDoc?.id]);
 
-  // Keyboard: Escape closes, ArrowLeft/Right navigates
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
@@ -138,11 +138,8 @@ export function DocumentViewerModal({
     return () => window.removeEventListener("keydown", handleKey);
   }, [docs.length, onClose]);
 
-  // Clamp selectedIdx when docs reload
   useEffect(() => {
-    if (docs.length > 0 && selectedIdx >= docs.length) {
-      setSelectedIdx(docs.length - 1);
-    }
+    if (docs.length > 0 && selectedIdx >= docs.length) setSelectedIdx(docs.length - 1);
   }, [docs.length]);
 
   async function handleDownload(docId: number) {
@@ -177,13 +174,8 @@ export function DocumentViewerModal({
     if (addUploadingRef.current) return;
 
     const initialItems: AddFileItem[] = selected.map((file) => {
-      if (!ADD_ALLOWED_MIME_TYPES.has(file.type)) {
-        return { file, status: "error", error: `Tipo no permitido: ${file.type || "desconocido"}.` };
-      }
-      if (file.size > ADD_MAX_FILE_BYTES) {
-        return { file, status: "error", error: `El archivo supera el tamaño máximo (${ADD_MAX_FILE_BYTES / (1024 * 1024)} MB).` };
-      }
-      return { file, status: "idle" as const };
+      const err = validateUploadFile(file);
+      return err ? { file, status: "error", error: err } : { file, status: "idle" as const };
     });
     setAddItems(initialItems);
 
@@ -227,14 +219,7 @@ export function DocumentViewerModal({
 
   return (
     <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 z-50 bg-brand-900/50"
-        onClick={onClose}
-        aria-hidden="true"
-      />
-
-      {/* Modal */}
+      <div className="fixed inset-0 z-50 bg-brand-900/50" onClick={onClose} aria-hidden="true" />
       <div
         className="fixed inset-0 z-50 flex items-center justify-center p-4"
         role="dialog"
@@ -330,9 +315,7 @@ export function DocumentViewerModal({
                         <p className="truncate font-medium">{doc.file?.name ?? `Archivo ${doc.id}`}</p>
                         <p className="text-xs text-neutral-400">
                           {doc.file?.size_bytes != null ? formatBytes(doc.file.size_bytes) : ""}
-                          {doc.audit?.added?.at
-                            ? ` · ${formatDate(doc.audit.added.at)}`
-                            : ""}
+                          {doc.audit?.added?.at ? ` · ${formatDate(doc.audit.added.at)}` : ""}
                         </p>
                         {doc.verified && (
                           <span className="mt-1 inline-block rounded bg-green-100 px-1.5 py-0.5 text-[10px] font-medium text-green-700">
@@ -352,7 +335,7 @@ export function DocumentViewerModal({
                     <input
                       type="file"
                       multiple
-                      accept="application/pdf,image/png,image/jpeg,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                      accept={UPLOAD_ACCEPT}
                       ref={addFileRef}
                       className="hidden"
                       onChange={handleAddFilesSelected}
@@ -392,7 +375,6 @@ export function DocumentViewerModal({
             <main className="flex min-w-0 flex-1 flex-col bg-neutral-50">
               {selectedDoc ? (
                 <>
-                  {/* Preview toolbar */}
                   <div className="flex shrink-0 items-center justify-between border-b border-neutral-200 bg-white px-4 py-2">
                     <div className="flex items-center gap-2">
                       <button
@@ -419,22 +401,10 @@ export function DocumentViewerModal({
                     </div>
                     <div className="flex items-center gap-2">
                       {onAddMore && (
-                        <Button
-                          variant="ghost"
-                          className="gap-1 px-3 py-1.5 text-xs"
-                          onClick={onAddMore}
-                        >
+                        <Button variant="ghost" className="gap-1 px-3 py-1.5 text-xs" onClick={onAddMore}>
                           <Plus size={14} />
                           Agregar archivos
                         </Button>
-                      )}
-                      {canSubmit && onSubmitted && (
-                        <SubmitValidationButton
-                          documentTypeId={documentTypeId}
-                          documentTypeName={documentTypeName}
-                          coveragePeriodStart={coveragePeriodStart}
-                          onSubmitted={onSubmitted}
-                        />
                       )}
                       <Button
                         variant="secondary"
@@ -447,7 +417,6 @@ export function DocumentViewerModal({
                     </div>
                   </div>
 
-                  {/* Preview content */}
                   <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto p-4">
                     {loadingPreview && !previewBlobUrl ? (
                       <p className="text-sm text-neutral-400">Cargando vista previa…</p>

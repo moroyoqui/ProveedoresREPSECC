@@ -1,124 +1,49 @@
-"""Portal del proveedor — endpoints para usuarios con rol supplier."""
+"""Portal del proveedor — operaciones de CARGA (escritura).
+
+Spec 013 (FR-009): aquí viven las únicas operaciones del portal que modifican
+información: subir archivos y enviar a validación. Lógica movida sin cambios
+desde el antiguo `routes.py` (reglas 009 intactas, FR-007).
+
+SEPARACIÓN respecto al back-office (documents/routes.py):
+  - Rol requerido: SUPPLIER (portal) vs ADMIN/MANAGER (back-office).
+  - El portal valida aquí: período futuro, límite de archivos por celda y estado
+    de celda (_check_upload_allowed). El back-office no aplica estas reglas.
+  - Ambos llaman a documents/service.upload_document() como capa de servicio
+    compartida. Agregar lógica exclusiva de un canal debe quedar en su ruta,
+    NO dentro del service.
+"""
 
 from __future__ import annotations
 
 from datetime import date, datetime, timezone
 
-from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, UploadFile
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from repse.auth.dependencies import CurrentUser, require_role
 from repse.compliance.models import ComplianceCellValidation
-from repse.compliance.schemas import ComplianceGridOut
-from repse.compliance.service import get_annual_compliance
 from repse.config import Settings, get_settings
 from repse.db.session import get_db
 from repse.db.tenant_filter import set_current_tenant
 from repse.documents.models import Document, DocumentStatus
-from repse.documents.service import ALLOWED_MIME_TYPES, UploadInput, upload_document
-from repse.errors import Conflict, UnprocessableEntity, ValidationFailure
-from repse.giros.models import Giro
+from repse.documents.service import UploadInput, upload_document
+from repse.errors import Conflict, UnprocessableEntity
 from repse.portal.models import PortalSubmission, PreSubmissionStatus, SubmissionStatus
-from repse.portal.schemas import PortalComplianceGridOut, SubmissionDetail, SubmissionOut, SubmitRequest, UploadOut
-from repse.sectors.models import Sector
-from repse.suppliers.models import Supplier
+from repse.portal.schemas import SubmissionOut, SubmitRequest, UploadOut
 from repse.users.models import Role
 
 router = APIRouter()
 
-_MIN_YEAR = 2020
+# Tipos permitidos propios del portal — independientes de documents/service.py.
+# Actualizar aquí no afecta al back-office y viceversa.
+_ALLOWED_MIME_TYPES = {
+    "application/pdf",
+    "image/png",
+    "image/jpeg",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+}
 _MAX_FILES_PER_CELL = 10
-
-
-def _current_year() -> int:
-    return date.today().year
-
-
-@router.get("/compliance", response_model=PortalComplianceGridOut)
-def portal_compliance(
-    year: int | None = Query(None),
-    user: CurrentUser = Depends(require_role(Role.SUPPLIER.value)),
-    db: Session = Depends(get_db),
-) -> PortalComplianceGridOut:
-    if user.supplier_id is None:
-        raise Conflict(
-            "User has no linked supplier",
-            details={"code": "supplier_not_linked"},
-        )
-    effective_year = year if year is not None else _current_year()
-    if effective_year < _MIN_YEAR or effective_year > _current_year():
-        raise ValidationFailure(
-            f"Year must be between {_MIN_YEAR} and {_current_year()}"
-        )
-    set_current_tenant(user.organization_id)
-    compliance = get_annual_compliance(
-        db,
-        supplier_id=user.supplier_id,
-        organization_id=user.organization_id,
-        year=effective_year,
-        portal_mode=True,
-    )
-    supplier = db.get(Supplier, user.supplier_id)
-    sector_out = None
-    giro_out = None
-    repse_folio = None
-    if supplier is not None:
-        repse_folio = supplier.repse_folio
-        if supplier.sector_id is not None:
-            sec = db.get(Sector, supplier.sector_id)
-            if sec is not None:
-                sector_out = {"id": sec.id, "name": sec.name}
-        if supplier.giro_id is not None:
-            gir = db.get(Giro, supplier.giro_id)
-            if gir is not None:
-                giro_out = {"id": gir.id, "name": gir.name}
-    return PortalComplianceGridOut(
-        **compliance.model_dump(),
-        sector=sector_out,
-        giro=giro_out,
-        repse_folio=repse_folio,
-    )
-
-
-@router.get("/history/{document_type_id}")
-def portal_document_history(
-    document_type_id: int,
-    user: CurrentUser = Depends(require_role(Role.SUPPLIER.value)),
-    db: Session = Depends(get_db),
-) -> list[dict]:
-    if user.supplier_id is None:
-        raise Conflict(
-            "User has no linked supplier",
-            details={"code": "supplier_not_linked"},
-        )
-    set_current_tenant(user.organization_id)
-    rows = db.execute(
-        select(Document)
-        .where(
-            Document.supplier_id == user.supplier_id,
-            Document.document_type_id == document_type_id,
-            Document.organization_id == user.organization_id,
-            Document.deleted_at.is_(None),
-        )
-        .order_by(Document.coverage_period_start.desc(), Document.version.desc())
-    ).scalars().all()
-
-    return [
-        {
-            "id": doc.id,
-            "version": doc.version,
-            "is_latest": doc.is_latest,
-            "coverage_period_start": doc.coverage_period_start.isoformat() if doc.coverage_period_start else None,
-            "coverage_period_end": doc.coverage_period_end.isoformat() if doc.coverage_period_end else None,
-            "due_date_effective": doc.due_date_effective.isoformat() if doc.due_date_effective else None,
-            "status": doc.status.value if doc.status else None,
-            "file_name_original": doc.file_name_original,
-            "uploaded_by": doc.uploaded_by,
-            "created_at": doc.created_at.isoformat() if doc.created_at else None,
-        }
-        for doc in rows
-    ]
 
 
 @router.post("/upload", status_code=201, response_model=UploadOut)
@@ -149,7 +74,7 @@ def portal_upload(
                 details={"code": "future_period"},
             )
 
-    if file.content_type not in ALLOWED_MIME_TYPES:
+    if file.content_type not in _ALLOWED_MIME_TYPES:
         raise UnprocessableEntity(
             "File type not accepted for this document type",
             details={"code": "invalid_file_type"},
@@ -307,43 +232,6 @@ def portal_submit(
         coverage_period_start=submission.coverage_period_start,
         submitted_at=submission.submitted_at,
         status=submission.status,
-    )
-
-
-@router.get("/submission/{document_type_id}", response_model=SubmissionDetail | None)
-def portal_get_submission(
-    document_type_id: int,
-    coverage_period_start: date | None = Query(None),
-    user: CurrentUser = Depends(require_role(Role.SUPPLIER.value)),
-    db: Session = Depends(get_db),
-) -> SubmissionDetail | None:
-    if user.supplier_id is None:
-        raise Conflict(
-            "User has no linked supplier",
-            details={"code": "supplier_not_linked"},
-        )
-    set_current_tenant(user.organization_id)
-
-    row = db.execute(
-        select(PortalSubmission)
-        .where(
-            PortalSubmission.organization_id == user.organization_id,
-            PortalSubmission.supplier_id == user.supplier_id,
-            PortalSubmission.document_type_id == document_type_id,
-            PortalSubmission.coverage_period_start == coverage_period_start,
-        )
-        .order_by(PortalSubmission.submitted_at.desc())
-    ).scalars().first()
-
-    if row is None:
-        return None
-
-    return SubmissionDetail(
-        submission_id=row.id,
-        status=row.status,
-        submitted_at=row.submitted_at,
-        rejection_reason=row.rejection_reason,
-        rejected_at=row.updated_at if row.status == SubmissionStatus.REJECTED else None,
     )
 
 

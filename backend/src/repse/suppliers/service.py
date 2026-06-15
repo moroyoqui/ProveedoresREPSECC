@@ -183,8 +183,17 @@ def update_supplier(
 
     before = {
         "legal_name": supplier.legal_name,
+        "rfc": supplier.rfc,
         "status": supplier.status.value,
     }
+
+    if body.rfc is not None and body.rfc != supplier.rfc:
+        conflict = db.execute(
+            select(Supplier).where(Supplier.rfc == body.rfc, Supplier.id != supplier_id)
+        ).scalar_one_or_none()
+        if conflict is not None:
+            raise Conflict("RFC already exists for another supplier", details={"code": "rfc_exists"})
+        supplier.rfc = body.rfc
 
     if body.legal_name is not None:
         supplier.legal_name = body.legal_name
@@ -218,6 +227,7 @@ def update_supplier(
 
     after = {
         "legal_name": supplier.legal_name,
+        "rfc": supplier.rfc,
         "status": supplier.status.value,
     }
     if before != after:

@@ -3,6 +3,7 @@ import type { ComplianceGrid as ComplianceGridData } from "@/lib/api/index";
 
 import { COMPLIANCE_LEGEND, ComplianceCell, type UploadClickParams, type ViewerClickParams } from "./ComplianceCell";
 import { DocumentViewerModal } from "@/components/documents/DocumentViewerModal";
+import { PortalDocumentViewerModal } from "@/components/portal/PortalDocumentViewerModal";
 import type { CellStatus } from "@/lib/api/index";
 
 const PORTAL_UPLOADABLE: ReadonlySet<CellStatus> = new Set(["missing", "pending", "expired"]);
@@ -179,27 +180,30 @@ export function ComplianceGrid({ data, readOnly = false, onUploadClick, onViewer
       <ComplianceLegend />
 
       {viewerState && (
-        <DocumentViewerModal
-          supplierId={data.supplier.id}
-          documentTypeId={viewerState.document_type_id}
-          documentTypeName={viewerState.documentTypeName}
-          coveragePeriodStart={viewerState.coverage_period_start}
-          canAddDocuments={
-            portalMode
-              ? PORTAL_UPLOADABLE.has(viewerState.cellStatus) && !viewerState.typeValidated
-              : !readOnly && !viewerState.typeValidated && viewerState.cellStatus !== "not_required"
-          }
-          typeValidated={viewerState.typeValidated}
-          canValidateType={!portalMode && !readOnly && !viewerState.typeValidated && viewerState.cellStatus !== "not_required"}
-          canSubmit={portalMode && PORTAL_UPLOADABLE.has(viewerState.cellStatus)}
-          {...(portalMode && onSubmitted
-            ? { onSubmitted: () => { onSubmitted(); setViewerState(null); } }
-            : {})}
-          {...(portalMode && uploadFn
-            ? { uploadFn: (file) => uploadFn(file, viewerState.document_type_id, viewerState.coverage_period_start) }
-            : {})}
-          onClose={() => { setViewerState(null); onViewerClose?.(); }}
-        />
+        portalMode ? (
+          <PortalDocumentViewerModal
+            supplierId={data.supplier.id}
+            documentTypeId={viewerState.document_type_id}
+            documentTypeName={viewerState.documentTypeName}
+            coveragePeriodStart={viewerState.coverage_period_start}
+            canAddDocuments={!readOnly && PORTAL_UPLOADABLE.has(viewerState.cellStatus) && !viewerState.typeValidated}
+            canSubmit={!readOnly && PORTAL_UPLOADABLE.has(viewerState.cellStatus)}
+            {...(onSubmitted ? { onSubmitted: () => { onSubmitted(); setViewerState(null); } } : {})}
+            {...(uploadFn ? { uploadFn: (file) => uploadFn(file, viewerState.document_type_id, viewerState.coverage_period_start) } : {})}
+            onClose={() => { setViewerState(null); onViewerClose?.(); }}
+          />
+        ) : (
+          <DocumentViewerModal
+            supplierId={data.supplier.id}
+            documentTypeId={viewerState.document_type_id}
+            documentTypeName={viewerState.documentTypeName}
+            coveragePeriodStart={viewerState.coverage_period_start}
+            canAddDocuments={!readOnly && !viewerState.typeValidated && viewerState.cellStatus !== "not_required"}
+            typeValidated={viewerState.typeValidated}
+            canValidateType={!readOnly && !viewerState.typeValidated && viewerState.cellStatus !== "not_required"}
+            onClose={() => { setViewerState(null); onViewerClose?.(); }}
+          />
+        )
       )}
     </div>
   );

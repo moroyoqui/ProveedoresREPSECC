@@ -136,7 +136,7 @@ def _add_document(db_session, session_user, supplier, doc_type, status="expired"
             file_mime_type="application/pdf",
             file_sha256="c" * 64,
             ocr_status=OcrStatus.NOT_RUN,
-            uploaded_by=None,
+            uploaded_by=session_user.id,
         )
         db_session.add(doc)
         db_session.commit()
@@ -156,7 +156,7 @@ def _add_pending_submission(db_session, session_user, supplier, doc_type, status
             document_type_id=doc_type.id,
             coverage_period_start=_PAST_PERIOD,
             submitted_at=datetime.now(timezone.utc).replace(tzinfo=None),
-            submitted_by=None,
+            submitted_by=session_user.id,
             status=SubmissionStatus(status),
             rejection_reason=rejection_reason,
             pre_submission_status=PreSubmissionStatus.MISSING,

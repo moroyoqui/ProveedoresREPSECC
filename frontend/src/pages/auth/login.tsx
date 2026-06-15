@@ -18,7 +18,7 @@ export function LoginPage() {
     try {
       await apiFetch("/auth/login", {
         method: "POST",
-        json: { email, password },
+        json: { email, password, audience: "backoffice" },
       });
       navigate("/suppliers", { replace: true });
     } catch (err) {
@@ -92,6 +92,13 @@ export function LoginPage() {
           >
             Continuar con Microsoft
           </a>
+
+          <p className="text-center text-xs text-neutral-500">
+            ¿Eres proveedor?{" "}
+            <a href="/portal/login" className="font-medium text-brand-700 hover:underline">
+              Entra por el portal
+            </a>
+          </p>
         </CardBody>
       </Card>
     </main>

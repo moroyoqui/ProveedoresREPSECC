@@ -38,7 +38,7 @@ def test_create_supplier_rejects_duplicate_rfc(client_with_session) -> None:
         json={**payload, "legal_name": "Empresa A duplicada"},
     )
     assert second.status_code == 409
-    assert second.json()["error"]["code"] == "rfc_exists"
+    assert second.json()["error"]["details"]["code"] == "rfc_exists"
 
 
 def test_create_supplier_validates_rfc_format(client_with_session) -> None:

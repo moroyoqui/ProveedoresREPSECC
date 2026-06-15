@@ -87,7 +87,7 @@ def test_portal_compliance_supplier_without_supplier_id_returns_409(
     res = c.get("/api/v1/portal/compliance")
     assert res.status_code == 409
     body = res.json()
-    assert body["error"]["code"] == "supplier_not_linked"
+    assert body["error"]["details"]["code"] == "supplier_not_linked"
 
 
 def test_portal_compliance_supplier_with_valid_supplier_id_returns_200(

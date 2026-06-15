@@ -4,6 +4,7 @@
 
 import { apiFetch } from "@/lib/api";
 import type { ComplianceGrid } from "@/lib/api/index";
+import type { DocumentListPage } from "@/lib/api/documents";
 
 export type DocumentHistoryItem = {
   id: number;
@@ -55,6 +56,25 @@ export const portalApi = {
 
   getDocumentHistory: (documentTypeId: number): Promise<DocumentHistoryItem[]> =>
     apiFetch<DocumentHistoryItem[]>(`/portal/history/${documentTypeId}`),
+
+  // Lista de archivos de la propia empresa para una celda (spec 013, FR-010).
+  listDocuments: (
+    documentTypeId: number,
+    coveragePeriodStart: string | null,
+    limit = 50,
+  ): Promise<DocumentListPage> => {
+    const params = new URLSearchParams({
+      document_type_id: String(documentTypeId),
+      limit: String(limit),
+    });
+    if (coveragePeriodStart != null) params.set("coverage_period_start", coveragePeriodStart);
+    return apiFetch<DocumentListPage>(`/portal/documents?${params.toString()}`);
+  },
+
+  downloadToken: (documentId: number): Promise<{ token: string; expires_at: string }> =>
+    apiFetch<{ token: string; expires_at: string }>(
+      `/portal/documents/${documentId}/download-token`
+    ),
 
   upload: (
     file: File,

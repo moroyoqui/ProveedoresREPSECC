@@ -68,43 +68,28 @@ export function AppShell() {
           </div>
         )}
         <nav className="flex-1 p-3">
-          {user?.role === "supplier" ? (
-            <Link
-              to="/portal"
-              className={cn(
-                "flex items-center gap-3 rounded-md px-3 py-2 text-sm",
-                location.pathname.startsWith("/portal")
-                  ? "bg-white/20 font-medium text-white"
-                  : "text-blue-100 hover:bg-white/10"
-              )}
-            >
-              <FileStack size={16} />
-              Mi documentación
-            </Link>
-          ) : (
-            NAV.filter((item) => !item.adminOnly || user?.role === "admin").map((item) => {
-              const Icon = item.icon;
-              const active =
-                item.to === "/"
-                  ? location.pathname === "/"
-                  : location.pathname.startsWith(item.to);
-              return (
-                <Link
-                  key={item.to}
-                  to={item.to}
-                  className={cn(
-                    "flex items-center gap-3 rounded-md px-3 py-2 text-sm",
-                    active
-                      ? "bg-white/20 font-medium text-white"
-                      : "text-blue-100 hover:bg-white/10"
-                  )}
-                >
-                  <Icon size={16} />
-                  {item.label}
-                </Link>
-              );
-            })
-          )}
+          {NAV.filter((item) => !item.adminOnly || user?.role === "admin").map((item) => {
+            const Icon = item.icon;
+            const active =
+              item.to === "/"
+                ? location.pathname === "/"
+                : location.pathname.startsWith(item.to);
+            return (
+              <Link
+                key={item.to}
+                to={item.to}
+                className={cn(
+                  "flex items-center gap-3 rounded-md px-3 py-2 text-sm",
+                  active
+                    ? "bg-white/20 font-medium text-white"
+                    : "text-blue-100 hover:bg-white/10"
+                )}
+              >
+                <Icon size={16} />
+                {item.label}
+              </Link>
+            );
+          })}
         </nav>
         <div className="border-t border-white/20 p-3 text-sm">
           {user && (

@@ -60,7 +60,18 @@ class SupplierIn(BaseModel):
 
 class SupplierPatch(BaseModel):
     legal_name: str | None = Field(None, min_length=3, max_length=255)
+    rfc: str | None = Field(None, min_length=12, max_length=13)
     supplier_type_id: int | None = None
+
+    @field_validator("rfc")
+    @classmethod
+    def _rfc_format(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        normalized = v.strip().upper()
+        if not RFC_RE.match(normalized):
+            raise ValueError("RFC format invalid")
+        return normalized
     sector_id: int | None = None
     giro_id: int | None = None
     contact_name: str | None = Field(None, max_length=120)

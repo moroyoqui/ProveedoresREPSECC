@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 
 import { AppShell } from "@/components/layout/AppShell";
+import { PortalShell } from "@/components/layout/PortalShell";
 import { ApiError } from "@/lib/api";
 import { authApi } from "@/lib/api/index";
 import { useAuth } from "@/lib/auth";
@@ -20,16 +21,23 @@ import { SuppliersListPage } from "@/pages/suppliers/list";
 import { NewSupplierPage } from "@/pages/suppliers/new";
 import { DocumentsListPage } from "@/pages/documents/list";
 import { UsersListPage } from "@/pages/users/list";
-import { PortalPage } from "@/pages/portal/index";
+import { PortalConsultaPage } from "@/pages/portal/consulta";
+import { PortalCargaPage } from "@/pages/portal/carga";
+import { PortalLoginPage } from "@/pages/portal/login";
 
 export function AppRouter() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/portal/login" element={<PortalLoginPage />} />
+        <Route path="/portal" element={<RequireAuth><RequireSupplier><PortalShell /></RequireSupplier></RequireAuth>}>
+          <Route index element={<Navigate to="/portal/consulta" replace />} />
+          <Route path="consulta" element={<PortalConsultaPage />} />
+          <Route path="carga" element={<PortalCargaPage />} />
+        </Route>
         <Route path="/" element={<RequireAuth><AppShell /></RequireAuth>}>
           <Route index element={<RootRedirect />} />
-          <Route path="portal" element={<PortalPage />} />
           <Route path="suppliers" element={<RequireNonSupplier><SuppliersListPage /></RequireNonSupplier>} />
           <Route path="suppliers/new" element={<RequireNonSupplier><NewSupplierPage /></RequireNonSupplier>} />
           <Route path="suppliers/:id" element={<RequireNonSupplier><SupplierDetailPage /></RequireNonSupplier>} />
@@ -55,7 +63,15 @@ export function AppRouter() {
 
 function RootRedirect() {
   const { user } = useAuth();
-  return <Navigate to={user?.role === "supplier" ? "/portal" : "/suppliers"} replace />;
+  return <Navigate to={user?.role === "supplier" ? "/portal/consulta" : "/suppliers"} replace />;
+}
+
+function RequireSupplier({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
+  if (user && user.role !== "supplier") {
+    return <Navigate to="/" replace />;
+  }
+  return <>{children}</>;
 }
 
 function RequireNonSupplier({ children }: { children: React.ReactNode }) {
@@ -103,7 +119,9 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
   }
 
   if (isError && error instanceof ApiError && error.status === 401) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
+    // Cada audiencia tiene su propia puerta de entrada (spec 013, FR-012).
+    const loginPath = location.pathname.startsWith("/portal") ? "/portal/login" : "/login";
+    return <Navigate to={loginPath} state={{ from: location }} replace />;
   }
 
   return <>{children}</>;

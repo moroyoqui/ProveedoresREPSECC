@@ -18,6 +18,7 @@ class UserOut(BaseModel):
     role: Role
     status: UserStatus
     supplier_id: int | None = None
+    supplier_name: str | None = None
     last_login_at: datetime | None = None
 
 

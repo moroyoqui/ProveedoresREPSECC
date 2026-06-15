@@ -4,15 +4,7 @@ import { CheckCircle, XCircle, Loader2, RefreshCcw, X } from "lucide-react";
 import { Button, Card, CardBody, CardHeader, CardTitle } from "@/components/ui";
 import { ApiError } from "@/lib/api";
 import { portalApi } from "@/lib/api/portal";
-
-const ALLOWED_MIME_TYPES = new Set([
-  "application/pdf",
-  "image/png",
-  "image/jpeg",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-]);
-
-const MAX_FILE_BYTES = 20 * 1024 * 1024;
+import { UPLOAD_ACCEPT, UPLOAD_MAX_BYTES, validateUploadFile } from "@/lib/uploadConstraints";
 
 type FileStatus = "idle" | "uploading" | "success" | "error";
 
@@ -20,16 +12,6 @@ type FileItem = {
   file: File;
   status: FileStatus;
   error?: string;
-};
-
-function validateFile(f: File): string | null {
-  if (!ALLOWED_MIME_TYPES.has(f.type)) {
-    return `Tipo no permitido: ${f.type || "desconocido"}. Se aceptan PDF, PNG, JPG y DOCX.`;
-  }
-  if (f.size > MAX_FILE_BYTES) {
-    return `El archivo supera el tamaño máximo (${Math.round(MAX_FILE_BYTES / (1024 * 1024))} MB).`;
-  }
-  return null;
 }
 
 function formatBytes(bytes: number): string {
@@ -98,7 +80,7 @@ export function UploadPortalDialog({
     const selected = Array.from(e.target.files ?? []);
     if (selected.length === 0) return;
     const items: FileItem[] = selected.map((file) => {
-      const err = validateFile(file);
+      const err = validateUploadFile(file);
       return { file, status: err ? "error" : "idle", error: err ?? undefined };
     });
     setFiles(items);
@@ -217,13 +199,13 @@ export function UploadPortalDialog({
                 id="portal-upload-file"
                 type="file"
                 multiple
-                accept="application/pdf,image/png,image/jpeg,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                accept={UPLOAD_ACCEPT}
                 className="mt-1.5 block w-full text-sm"
                 onChange={handleFileChange}
                 disabled={isUploading}
               />
               <p className="mt-1 text-xs text-neutral-400">
-                PDF, PNG, JPG o DOCX · máx. {Math.round(MAX_FILE_BYTES / (1024 * 1024))} MB por archivo
+                PDF, PNG, JPG o DOCX · máx. {Math.round(UPLOAD_MAX_BYTES / (1024 * 1024))} MB por archivo
               </p>
             </div>
 

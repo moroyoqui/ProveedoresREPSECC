@@ -7,12 +7,21 @@ entorno real (testcontainers).
 """
 from __future__ import annotations
 
+import importlib.util
 import sys
 import types
 from types import SimpleNamespace
 
 
 def _stub(name: str, **attrs) -> types.ModuleType:  # type: ignore[return]
+    # Only stub modules that are NOT actually installed: pytest imports this
+    # conftest while collecting the whole tests/ tree, and stubbing a real
+    # package would poison the integration tests in the same run.
+    try:
+        if importlib.util.find_spec(name) is not None:
+            return sys.modules.get(name, types.ModuleType(name))
+    except (ImportError, ModuleNotFoundError, ValueError):
+        pass
     m = types.ModuleType(name)
     for k, v in attrs.items():
         setattr(m, k, v)
@@ -30,7 +39,8 @@ _pdf2image = _stub("pdf2image", convert_from_bytes=lambda *a, **kw: [])
 # PIL / Pillow
 _pil = _stub("PIL")
 _stub("PIL.Image", new=lambda *a, **kw: None, open=lambda *a, **kw: None)
-_pil.Image = sys.modules["PIL.Image"]
+if "PIL.Image" in sys.modules:
+    _pil.Image = sys.modules["PIL.Image"]
 # pytesseract
 _stub("pytesseract", image_to_string=lambda *a, **kw: "")
 # itsdangerous

@@ -9,6 +9,7 @@ require manual approval.
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from typing import Literal
 from urllib.parse import urlencode
 
 from authlib.integrations.starlette_client import OAuth, OAuthError
@@ -159,6 +160,8 @@ def _bootstrap_organization(db: Session, *, contact_email: str) -> Organization:
 class LoginIn(BaseModel):
     email: EmailStr
     password: str
+    # Puerta de entrada (spec 013, FR-013): "backoffice" (default) o "portal".
+    audience: Literal["backoffice", "portal"] = "backoffice"
 
 
 @router.post("/login")
@@ -197,6 +200,14 @@ def login_local(
             "Invalid email or password", details={"code": "invalid_credentials"}
         )
 
+    # Gating por audiencia (spec 013, FR-013): la respuesta del mismatch debe
+    # ser idéntica a la de credenciales inválidas para no revelar su validez.
+    is_supplier = user.role == Role.SUPPLIER
+    if (body.audience == "portal") != is_supplier:
+        raise ValidationFailure(
+            "Invalid email or password", details={"code": "invalid_credentials"}
+        )
+
     with with_admin_scope():
         user.last_login_at = datetime.now(timezone.utc)
         db.commit()
@@ -217,9 +228,12 @@ async def logout(
     response: Response,
     sessions: SessionManager = Depends(_session_mgr),
 ):
-    sessions.revoke(response)
-    response.delete_cookie(COOKIE_NAME, path="/")
-    return Response(status_code=204)
+    # Returning a fresh Response would discard the cookie headers set on the
+    # injected `response`; build the final response and attach deletion to it.
+    final = Response(status_code=204)
+    sessions.revoke(final)
+    final.delete_cookie(COOKIE_NAME, path="/")
+    return final
 
 
 @router.get("/me")

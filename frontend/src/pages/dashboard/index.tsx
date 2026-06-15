@@ -65,7 +65,7 @@ export function DashboardPage() {
         />
       </div>
 
-      {data.has_more && (
+      {data?.has_more && (
         <p className="mt-4 text-xs text-neutral-400">
           Los totales se calculan sobre los primeros resultados cargados. Amplía los filtros para ver
           todos los proveedores.

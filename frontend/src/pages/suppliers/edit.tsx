@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
   Button,
@@ -48,6 +48,7 @@ export function EditSupplierPage() {
   });
 
   const [legalName, setLegalName] = useState("");
+  const [rfc, setRfc] = useState("");
   const [contactName, setContactName] = useState("");
   const [contactEmail, setContactEmail] = useState("");
   const [contactPhone, setContactPhone] = useState("");
@@ -75,6 +76,7 @@ export function EditSupplierPage() {
   useEffect(() => {
     if (supplierQ.data) {
       setLegalName(supplierQ.data.legal_name);
+      setRfc(supplierQ.data.rfc);
       setContactName(supplierQ.data.contact_name ?? "");
       setContactEmail(supplierQ.data.contact_email ?? "");
       setContactPhone(supplierQ.data.contact_phone ?? "");
@@ -108,6 +110,7 @@ export function EditSupplierPage() {
 
   const baseFields = () => ({
     legal_name: legalName || undefined,
+    rfc: rfc || undefined,
     contact_name: contactName || undefined,
     contact_email: contactEmail || undefined,
     contact_phone: contactPhone || undefined,
@@ -208,9 +211,9 @@ export function EditSupplierPage() {
             />
             <FormField
               label="RFC"
-              value={supplierQ.data.rfc}
-              disabled
-              hint="El RFC no se edita aquí (FR-006 spec 001)."
+              value={rfc}
+              onChange={(e) => setRfc(e.target.value.toUpperCase())}
+              placeholder="XAXX010101000"
             />
             <FormField
               label="Nombre de contacto"

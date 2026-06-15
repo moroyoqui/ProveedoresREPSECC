@@ -1,4 +1,11 @@
-"""Document routes (contracts/documents.md spec 001)."""
+"""Document routes (back-office, spec 001).
+
+SEPARACIÓN respecto al portal del proveedor (portal/routes_write.py):
+  - Rol requerido: ADMIN/MANAGER (back-office) vs SUPPLIER (portal).
+  - El back-office permite due_date_override y no restringe períodos futuros.
+  - Comparte documents/service.upload_document() con el portal. Lógica exclusiva
+    de este canal debe quedar aquí, NO dentro del service.
+"""
 
 from __future__ import annotations
 
@@ -26,6 +33,11 @@ from repse.suppliers.models import Supplier
 from repse.users.models import Role, User
 
 router = APIRouter()
+
+# Router separado para canjear tokens de descarga: lo usan tanto el back-office
+# como el portal del proveedor, por lo que se monta SIN el guard de back-office
+# (spec 013); la autorización viene del token firmado + checks por rol abajo.
+files_router = APIRouter()
 
 
 def _file_store(settings: Settings = Depends(get_settings)) -> FileStore:
@@ -148,7 +160,7 @@ def issue_download_token(
     }
 
 
-@router.get("/files/{token}", include_in_schema=False)
+@files_router.get("/files/{token}", include_in_schema=False)
 def download_file(
     token: str,
     inline: bool = False,
@@ -168,6 +180,10 @@ def download_file(
 
     doc = db.get(Document, payload.get("file_id"))
     if doc is None or doc.organization_id != user.organization_id:
+        raise NotFound("Document not found")
+
+    # Spec 013 (FR-010): un proveedor solo puede descargar archivos de su empresa.
+    if user.role == Role.SUPPLIER.value and doc.supplier_id != user.supplier_id:
         raise NotFound("Document not found")
 
     disposition = "inline" if inline else "attachment"

@@ -20,11 +20,16 @@ from repse.observability import metrics as metrics_mod
 from repse.observability.sentry import init_sentry
 
 # Domain routers (Phase 3).
+from fastapi import Depends
+
 from repse.audit.routes import router as audit_router
+from repse.auth.dependencies import require_backoffice
 from repse.auth.routes import router as auth_router
-from repse.portal.routes import router as portal_router
+from repse.portal.routes_read import router as portal_read_router
+from repse.portal.routes_write import router as portal_write_router
 from repse.compliance.routes import router as compliance_router
 from repse.documents.jobs import schedule_daily_recalculation
+from repse.documents.routes import files_router as files_router
 from repse.documents.routes import router as documents_router
 from repse.document_types.routes import router as document_types_router
 from repse.giros.routes import router as giros_router
@@ -108,18 +113,24 @@ async def health() -> dict[str, str]:
 
 API_PREFIX = "/api/v1"
 
+# Guard de audiencia (spec 013, FR-008): los routers administrativos excluyen
+# el rol supplier; los del portal exigen rol supplier vía require_role.
+_BACKOFFICE = [Depends(require_backoffice)]
+
 app.include_router(auth_router, prefix=f"{API_PREFIX}/auth", tags=["auth"])
-app.include_router(organizations_router, prefix=f"{API_PREFIX}/organization", tags=["organization"])
-app.include_router(users_router, prefix=f"{API_PREFIX}/users", tags=["users"])
-app.include_router(supplier_types_router, prefix=f"{API_PREFIX}/supplier-types", tags=["supplier-types"])
-app.include_router(supplier_type_requirements_router, prefix=f"{API_PREFIX}/supplier-type-requirements", tags=["supplier-type-requirements"])
-app.include_router(document_types_router, prefix=f"{API_PREFIX}/document-types", tags=["document-types"])
-app.include_router(sectors_router, prefix=f"{API_PREFIX}/sectors", tags=["sectors"])
-app.include_router(giros_router, prefix=f"{API_PREFIX}/giros", tags=["giros"])
-app.include_router(suppliers_router, prefix=f"{API_PREFIX}/suppliers", tags=["suppliers"])
-app.include_router(documents_router, prefix=f"{API_PREFIX}", tags=["documents"])
-app.include_router(compliance_router, prefix=f"{API_PREFIX}", tags=["compliance"])
-app.include_router(audit_router, prefix=f"{API_PREFIX}/audit-log", tags=["audit-log"])
-app.include_router(portal_router, prefix=f"{API_PREFIX}/portal", tags=["portal"])
+app.include_router(organizations_router, prefix=f"{API_PREFIX}/organization", tags=["organization"], dependencies=_BACKOFFICE)
+app.include_router(users_router, prefix=f"{API_PREFIX}/users", tags=["users"], dependencies=_BACKOFFICE)
+app.include_router(supplier_types_router, prefix=f"{API_PREFIX}/supplier-types", tags=["supplier-types"], dependencies=_BACKOFFICE)
+app.include_router(supplier_type_requirements_router, prefix=f"{API_PREFIX}/supplier-type-requirements", tags=["supplier-type-requirements"], dependencies=_BACKOFFICE)
+app.include_router(document_types_router, prefix=f"{API_PREFIX}/document-types", tags=["document-types"], dependencies=_BACKOFFICE)
+app.include_router(sectors_router, prefix=f"{API_PREFIX}/sectors", tags=["sectors"], dependencies=_BACKOFFICE)
+app.include_router(giros_router, prefix=f"{API_PREFIX}/giros", tags=["giros"], dependencies=_BACKOFFICE)
+app.include_router(suppliers_router, prefix=f"{API_PREFIX}/suppliers", tags=["suppliers"], dependencies=_BACKOFFICE)
+app.include_router(documents_router, prefix=f"{API_PREFIX}", tags=["documents"], dependencies=_BACKOFFICE)
+app.include_router(compliance_router, prefix=f"{API_PREFIX}", tags=["compliance"], dependencies=_BACKOFFICE)
+app.include_router(audit_router, prefix=f"{API_PREFIX}/audit-log", tags=["audit-log"], dependencies=_BACKOFFICE)
+app.include_router(files_router, prefix=f"{API_PREFIX}", tags=["files"])
+app.include_router(portal_read_router, prefix=f"{API_PREFIX}/portal", tags=["portal-read"])
+app.include_router(portal_write_router, prefix=f"{API_PREFIX}/portal", tags=["portal-write"])
 
 __all__ = ["app"]
