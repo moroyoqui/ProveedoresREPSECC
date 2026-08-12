@@ -6,7 +6,7 @@ from datetime import datetime
 from enum import StrEnum
 
 from sqlalchemy import BigInteger, Enum, ForeignKey, String, Text, UniqueConstraint
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from repse.db.base import Base, TimestampMixin
 from repse.db.tenant_filter import TenantOwned
@@ -30,6 +30,18 @@ class Supplier(Base, TimestampMixin, TenantOwned):
         nullable=False,
         index=True,
     )
+    sector_id: Mapped[int | None] = mapped_column(
+        BigInteger,
+        ForeignKey("sectors.id", ondelete="RESTRICT", name="fk_suppliers_sector_id_sectors"),
+        nullable=True,
+        index=True,
+    )
+    giro_id: Mapped[int | None] = mapped_column(
+        BigInteger,
+        ForeignKey("giros.id", ondelete="RESTRICT", name="fk_suppliers_giro_id_giros"),
+        nullable=True,
+        index=True,
+    )
     legal_name: Mapped[str] = mapped_column(String(255), nullable=False)
     rfc: Mapped[str] = mapped_column(String(13), nullable=False)
     contact_name: Mapped[str | None] = mapped_column(String(255))
@@ -43,4 +55,12 @@ class Supplier(Base, TimestampMixin, TenantOwned):
         index=True,
     )
     notes: Mapped[str | None] = mapped_column(Text)
+    repse_folio: Mapped[str | None] = mapped_column(String(60), nullable=True)
     deleted_at: Mapped[datetime | None]
+
+    sector: Mapped["Sector | None"] = relationship(  # type: ignore[name-defined]
+        "Sector", foreign_keys=[sector_id], lazy="select"
+    )
+    giro: Mapped["Giro | None"] = relationship(  # type: ignore[name-defined]
+        "Giro", foreign_keys=[giro_id], lazy="select"
+    )

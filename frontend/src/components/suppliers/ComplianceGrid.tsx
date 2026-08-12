@@ -3,21 +3,30 @@ import type { ComplianceGrid as ComplianceGridData } from "@/lib/api/index";
 
 import { COMPLIANCE_LEGEND, ComplianceCell, type UploadClickParams, type ViewerClickParams } from "./ComplianceCell";
 import { DocumentViewerModal } from "@/components/documents/DocumentViewerModal";
+import { PortalDocumentViewerModal } from "@/components/portal/PortalDocumentViewerModal";
 import type { CellStatus } from "@/lib/api/index";
+
+const PORTAL_UPLOADABLE: ReadonlySet<CellStatus> = new Set(["missing", "pending", "expired"]);
 
 const MONTH_LABELS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 
 type ViewerState = ViewerClickParams & {
   documentTypeName: string;
   cellStatus: CellStatus;
+  typeValidated: boolean;
 };
 
 type ComplianceGridProps = {
   data: ComplianceGridData;
+  readOnly?: boolean;
   onUploadClick?: (params: UploadClickParams) => void;
+  onViewerClose?: () => void;
+  portalMode?: boolean;
+  onSubmitted?: () => void;
+  uploadFn?: (file: File, documentTypeId: number, coveragePeriodStart: string | null) => Promise<void>;
 };
 
-export function ComplianceGrid({ data, onUploadClick }: ComplianceGridProps) {
+export function ComplianceGrid({ data, readOnly = false, onUploadClick, onViewerClose, portalMode = false, onSubmitted, uploadFn }: ComplianceGridProps) {
   const [viewerState, setViewerState] = useState<ViewerState | null>(null);
   if (data.monthly_requirements.length === 0) {
     return (
@@ -118,7 +127,7 @@ export function ComplianceGrid({ data, onUploadClick }: ComplianceGridProps) {
                                 : null
                             }
                             onViewerClick={(params) =>
-                              setViewerState({ ...params, documentTypeName: req.document_type.name, cellStatus: cell.status })
+                              setViewerState({ ...params, documentTypeName: req.document_type.name, cellStatus: cell.status, typeValidated: cell.type_validated ?? false })
                             }
                             onUploadClick={onUploadClick}
                           />
@@ -155,9 +164,9 @@ export function ComplianceGrid({ data, onUploadClick }: ComplianceGridProps) {
                             : null
                         }
                         onViewerClick={(params) =>
-                          setViewerState({ ...params, documentTypeName: req.document_type.name, cellStatus: cell.status })
+                          setViewerState({ ...params, documentTypeName: req.document_type.name, cellStatus: cell.status, typeValidated: cell.type_validated ?? false })
                         }
-                        onUploadClick={onUploadClick}
+                        {...(!portalMode && onUploadClick ? { onUploadClick } : {})}
                       />
                     </div>
                   );
@@ -171,14 +180,30 @@ export function ComplianceGrid({ data, onUploadClick }: ComplianceGridProps) {
       <ComplianceLegend />
 
       {viewerState && (
-        <DocumentViewerModal
-          supplierId={data.supplier.id}
-          documentTypeId={viewerState.document_type_id}
-          documentTypeName={viewerState.documentTypeName}
-          coveragePeriodStart={viewerState.coverage_period_start}
-          canAddDocuments={viewerState.cellStatus !== "validated"}
-          onClose={() => setViewerState(null)}
-        />
+        portalMode ? (
+          <PortalDocumentViewerModal
+            supplierId={data.supplier.id}
+            documentTypeId={viewerState.document_type_id}
+            documentTypeName={viewerState.documentTypeName}
+            coveragePeriodStart={viewerState.coverage_period_start}
+            canAddDocuments={!readOnly && PORTAL_UPLOADABLE.has(viewerState.cellStatus) && !viewerState.typeValidated}
+            canSubmit={!readOnly && PORTAL_UPLOADABLE.has(viewerState.cellStatus)}
+            {...(onSubmitted ? { onSubmitted: () => { onSubmitted(); setViewerState(null); } } : {})}
+            {...(uploadFn ? { uploadFn: (file) => uploadFn(file, viewerState.document_type_id, viewerState.coverage_period_start) } : {})}
+            onClose={() => { setViewerState(null); onViewerClose?.(); }}
+          />
+        ) : (
+          <DocumentViewerModal
+            supplierId={data.supplier.id}
+            documentTypeId={viewerState.document_type_id}
+            documentTypeName={viewerState.documentTypeName}
+            coveragePeriodStart={viewerState.coverage_period_start}
+            canAddDocuments={!readOnly && !viewerState.typeValidated && viewerState.cellStatus !== "not_required"}
+            typeValidated={viewerState.typeValidated}
+            canValidateType={!readOnly && !viewerState.typeValidated && viewerState.cellStatus !== "not_required"}
+            onClose={() => { setViewerState(null); onViewerClose?.(); }}
+          />
+        )
       )}
     </div>
   );

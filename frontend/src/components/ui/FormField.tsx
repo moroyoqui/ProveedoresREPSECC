@@ -26,7 +26,7 @@ export const FormField = forwardRef<HTMLInputElement, FormFieldProps>(function F
         className={cn(
           "h-10 rounded-md border bg-white px-3 text-sm",
           "border-neutral-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400",
-          error && "border-status-expired focus-visible:ring-red-300",
+          error ? "border-status-expired focus-visible:ring-red-300" : null,
           className
         )}
         aria-invalid={error ? "true" : undefined}

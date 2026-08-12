@@ -63,6 +63,21 @@ class Settings(BaseSettings):
     documents_recalc_enabled: bool = True
     documents_recalc_hour_utc: int = Field(default=5, ge=0, le=23)  # ~23:00 CST
 
+    # Alerts (spec 002): daily sweep gated here and per-tenant via AlertConfig.enabled.
+    alerts_scheduler_enabled: bool = True
+
+    # SMTP (spec 002): generic provider, on-prem friendly. No vendor SDK.
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_username: str = ""
+    smtp_password: SecretStr = SecretStr("")
+    smtp_use_starttls: bool = True
+    smtp_use_ssl: bool = False
+    smtp_from_email: str = "notificaciones@local.test"
+    smtp_from_name: str = "Cumplimiento REPSE"
+    smtp_reply_to: str = ""
+    smtp_timeout_seconds: int = Field(default=10, ge=1)
+
     @field_validator("app_secret")
     @classmethod
     def _validate_secret_length(cls, v: SecretStr, info: ValidationInfo) -> SecretStr:

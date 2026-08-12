@@ -6,16 +6,9 @@
 # y host:8443 -> container:443; el redirect default de Caddy no conoce los
 # puertos del host, por eso lo escribimos explícitamente.
 http://{$CADDY_DOMAIN} {
-    redir https://{$CADDY_DOMAIN}:8443{uri} permanent
-}
-
-https://{$CADDY_DOMAIN} {
-    tls internal
-
     encode gzip zstd
 
     header {
-        Strict-Transport-Security "max-age=31536000; includeSubDomains"
         X-Content-Type-Options "nosniff"
         X-Frame-Options "DENY"
         Referrer-Policy "strict-origin-when-cross-origin"

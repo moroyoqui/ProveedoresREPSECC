@@ -2,12 +2,16 @@ import { useQuery } from "@tanstack/react-query";
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 
 import { AppShell } from "@/components/layout/AppShell";
+import { PortalShell } from "@/components/layout/PortalShell";
 import { ApiError } from "@/lib/api";
 import { authApi } from "@/lib/api/index";
 import { useAuth } from "@/lib/auth";
 import { LoginPage } from "@/pages/auth/login";
 import { CatalogsHub } from "@/pages/settings/catalogs/index";
 import { DocumentTypesPage } from "@/pages/settings/catalogs/document-types";
+import { GirosPage } from "@/pages/settings/catalogs/giros";
+import { OrganizationSettingsPage } from "@/pages/settings/catalogs/organization";
+import { SectorsPage } from "@/pages/settings/catalogs/sectors";
 import { SupplierTypeDetailPage } from "@/pages/settings/catalogs/supplier-type-detail";
 import { SupplierTypesPage } from "@/pages/settings/catalogs/supplier-types";
 import { DashboardPage } from "@/pages/dashboard/index";
@@ -17,32 +21,65 @@ import { SuppliersListPage } from "@/pages/suppliers/list";
 import { NewSupplierPage } from "@/pages/suppliers/new";
 import { DocumentsListPage } from "@/pages/documents/list";
 import { UsersListPage } from "@/pages/users/list";
+import { PortalConsultaPage } from "@/pages/portal/consulta";
+import { PortalCargaPage } from "@/pages/portal/carga";
+import { PortalLoginPage } from "@/pages/portal/login";
 
 export function AppRouter() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/portal/login" element={<PortalLoginPage />} />
+        <Route path="/portal" element={<RequireAuth><RequireSupplier><PortalShell /></RequireSupplier></RequireAuth>}>
+          <Route index element={<Navigate to="/portal/consulta" replace />} />
+          <Route path="consulta" element={<PortalConsultaPage />} />
+          <Route path="carga" element={<PortalCargaPage />} />
+        </Route>
         <Route path="/" element={<RequireAuth><AppShell /></RequireAuth>}>
-          <Route index element={<Navigate to="/suppliers" replace />} />
-          <Route path="suppliers" element={<SuppliersListPage />} />
-          <Route path="suppliers/new" element={<NewSupplierPage />} />
-          <Route path="suppliers/:id" element={<SupplierDetailPage />} />
-          <Route path="suppliers/:id/edit" element={<EditSupplierPage />} />
-          <Route path="documents" element={<DocumentsListPage />} />
-          <Route path="dashboard" element={<DashboardPage />} />
-          <Route path="users" element={<UsersListPage />} />
-          <Route path="settings" element={<Navigate to="/settings/catalogs" replace />} />
-          <Route path="settings/catalogs" element={<CatalogsHub />}>
+          <Route index element={<RootRedirect />} />
+          <Route path="suppliers" element={<RequireNonSupplier><SuppliersListPage /></RequireNonSupplier>} />
+          <Route path="suppliers/new" element={<RequireNonSupplier><NewSupplierPage /></RequireNonSupplier>} />
+          <Route path="suppliers/:id" element={<RequireNonSupplier><SupplierDetailPage /></RequireNonSupplier>} />
+          <Route path="suppliers/:id/edit" element={<RequireNonSupplier><EditSupplierPage /></RequireNonSupplier>} />
+          <Route path="documents" element={<RequireNonSupplier><DocumentsListPage /></RequireNonSupplier>} />
+          <Route path="dashboard" element={<RequireNonSupplier><DashboardPage /></RequireNonSupplier>} />
+          <Route path="users" element={<RequireNonSupplier><UsersListPage /></RequireNonSupplier>} />
+          <Route path="settings" element={<Navigate to="/settings/catalogs/organization" replace />} />
+          <Route path="settings/catalogs" element={<RequireNonSupplier><CatalogsHub /></RequireNonSupplier>}>
+            <Route path="organization" element={<OrganizationSettingsPage />} />
             <Route path="document-types" element={<DocumentTypesPage />} />
             <Route path="supplier-types" element={<SupplierTypesPage />} />
             <Route path="supplier-types/:id" element={<SupplierTypeDetailPage />} />
+            <Route path="sectors" element={<SectorsPage />} />
+            <Route path="giros" element={<GirosPage />} />
           </Route>
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   );
+}
+
+function RootRedirect() {
+  const { user } = useAuth();
+  return <Navigate to={user?.role === "supplier" ? "/portal/consulta" : "/suppliers"} replace />;
+}
+
+function RequireSupplier({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
+  if (user && user.role !== "supplier") {
+    return <Navigate to="/" replace />;
+  }
+  return <>{children}</>;
+}
+
+function RequireNonSupplier({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
+  if (user?.role === "supplier") {
+    return <Navigate to="/portal" replace />;
+  }
+  return <>{children}</>;
 }
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -57,6 +94,7 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
         email: me.email,
         displayName: me.display_name,
         role: me.role,
+        supplierId: me.supplier_id,
         organization: {
           id: me.organization.id,
           legalName: me.organization.legal_name,
@@ -81,7 +119,9 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
   }
 
   if (isError && error instanceof ApiError && error.status === 401) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
+    // Cada audiencia tiene su propia puerta de entrada (spec 013, FR-012).
+    const loginPath = location.pathname.startsWith("/portal") ? "/portal/login" : "/login";
+    return <Navigate to={loginPath} state={{ from: location }} replace />;
   }
 
   return <>{children}</>;

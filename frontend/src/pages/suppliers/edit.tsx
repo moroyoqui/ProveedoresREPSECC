@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
   Button,
@@ -18,6 +18,8 @@ import {
   type AffectedDocument,
 } from "@/lib/api/suppliers";
 import { suppliersApi, supplierTypesApi } from "@/lib/api/index";
+import { sectorsApi } from "@/lib/api/sectors";
+import { girosApi } from "@/lib/api/giros";
 
 /**
  * Edición de un proveedor con flujo destructivo de cambio de tipo (T132 spec 001).
@@ -46,22 +48,43 @@ export function EditSupplierPage() {
   });
 
   const [legalName, setLegalName] = useState("");
+  const [rfc, setRfc] = useState("");
+  const [contactName, setContactName] = useState("");
   const [contactEmail, setContactEmail] = useState("");
   const [contactPhone, setContactPhone] = useState("");
+  const [repseFollio, setRepseFollio] = useState("");
   const [supplierTypeId, setSupplierTypeId] = useState<number | null>(null);
   const [originalTypeId, setOriginalTypeId] = useState<number | null>(null);
+  const [selectedSectorId, setSelectedSectorId] = useState<number | null>(null);
+  const [selectedGiroId, setSelectedGiroId] = useState<number | null>(null);
   const [topError, setTopError] = useState<string | null>(null);
   const [topNotice, setTopNotice] = useState<string | null>(null);
   const [pendingAffected, setPendingAffected] = useState<AffectedDocument[] | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
 
+  const { data: sectors = [] } = useQuery({
+    queryKey: ["sectors"],
+    queryFn: sectorsApi.list,
+  });
+
+  const { data: giros = [] } = useQuery({
+    queryKey: ["giros", selectedSectorId],
+    queryFn: () => girosApi.list(selectedSectorId ?? undefined),
+    enabled: selectedSectorId != null,
+  });
+
   useEffect(() => {
     if (supplierQ.data) {
       setLegalName(supplierQ.data.legal_name);
+      setRfc(supplierQ.data.rfc);
+      setContactName(supplierQ.data.contact_name ?? "");
       setContactEmail(supplierQ.data.contact_email ?? "");
-      setContactPhone(""); // El detalle actual no expone contact_phone; queda vacío.
+      setContactPhone(supplierQ.data.contact_phone ?? "");
+      setRepseFollio(supplierQ.data.repse_folio ?? "");
       setSupplierTypeId(supplierQ.data.supplier_type.id);
       setOriginalTypeId(supplierQ.data.supplier_type.id);
+      setSelectedSectorId(supplierQ.data.sector?.id ?? null);
+      setSelectedGiroId(supplierQ.data.giro?.id ?? null);
     }
   }, [supplierQ.data]);
 
@@ -87,8 +110,13 @@ export function EditSupplierPage() {
 
   const baseFields = () => ({
     legal_name: legalName || undefined,
+    rfc: rfc || undefined,
+    contact_name: contactName || undefined,
     contact_email: contactEmail || undefined,
     contact_phone: contactPhone || undefined,
+    repse_folio: repseFollio || undefined,
+    sector_id: selectedSectorId,
+    giro_id: selectedGiroId,
   });
 
   async function handleSave(event: React.FormEvent<HTMLFormElement>) {
@@ -183,9 +211,15 @@ export function EditSupplierPage() {
             />
             <FormField
               label="RFC"
-              value={supplierQ.data.rfc}
-              disabled
-              hint="El RFC no se edita aquí (FR-006 spec 001)."
+              value={rfc}
+              onChange={(e) => setRfc(e.target.value.toUpperCase())}
+              placeholder="XAXX010101000"
+            />
+            <FormField
+              label="Nombre de contacto"
+              value={contactName}
+              onChange={(e) => setContactName(e.target.value)}
+              placeholder="Juan Pérez"
             />
             <div>
               <label
@@ -210,6 +244,47 @@ export function EditSupplierPage() {
                 ))}
               </select>
             </div>
+            {/* Sector / Giro en cascada */}
+            <div>
+              <label className="text-sm font-medium text-brand-700" htmlFor="edit_sector_id">
+                Sector (opcional)
+              </label>
+              <select
+                id="edit_sector_id"
+                className="mt-1.5 h-10 w-full rounded-md border border-neutral-300 bg-white px-3 text-sm"
+                value={selectedSectorId ?? ""}
+                onChange={(e) => {
+                  const v = e.target.value ? Number(e.target.value) : null;
+                  setSelectedSectorId(v);
+                  setSelectedGiroId(null);
+                }}
+                disabled={sectors.length === 0}
+              >
+                <option value="">Sin clasificar</option>
+                {sectors.map((s) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-brand-700" htmlFor="edit_giro_id">
+                Giro (opcional)
+              </label>
+              <select
+                id="edit_giro_id"
+                className="mt-1.5 h-10 w-full rounded-md border border-neutral-300 bg-white px-3 text-sm"
+                value={selectedGiroId ?? ""}
+                onChange={(e) => setSelectedGiroId(e.target.value ? Number(e.target.value) : null)}
+                disabled={selectedSectorId == null}
+              >
+                <option value="">
+                  {selectedSectorId == null ? "Selecciona un sector primero" : "Sin giro específico"}
+                </option>
+                {giros.map((g) => (
+                  <option key={g.id} value={g.id}>{g.name}</option>
+                ))}
+              </select>
+            </div>
             <FormField
               type="email"
               label="Correo de contacto"
@@ -220,6 +295,12 @@ export function EditSupplierPage() {
               label="Teléfono de contacto"
               value={contactPhone}
               onChange={(e) => setContactPhone(e.target.value)}
+            />
+            <FormField
+              label="Folio REPSE"
+              value={repseFollio}
+              onChange={(e) => setRepseFollio(e.target.value)}
+              placeholder="REPSE-2024-00001234"
             />
             <div className="flex justify-end gap-3 pt-2">
               <Link to={`/suppliers/${supplierId}`}>

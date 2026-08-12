@@ -9,13 +9,14 @@ import { apiFetch } from "@/lib/api";
 
 // ---------- Auth + Org ----------
 
-export type Role = "admin" | "manager" | "viewer";
+export type Role = "admin" | "manager" | "viewer" | "supplier";
 
 export type MeResponse = {
   id: number;
   email: string;
   display_name: string;
   role: Role;
+  supplier_id?: number | null;
   organization: {
     id: number;
     legal_name: string;
@@ -32,6 +33,31 @@ export const authApi = {
   logout: () => apiFetch<void>("/auth/logout", { method: "POST" }),
 };
 
+// ---------- Organization ----------
+
+export type OrganizationOut = {
+  id: number;
+  legal_name: string;
+  rfc: string;
+  contact_email: string;
+  expiring_soon_threshold_days: number;
+  timezone: string;
+  status: string;
+};
+
+export type OrganizationPatch = {
+  legal_name?: string;
+  contact_email?: string;
+  expiring_soon_threshold_days?: number;
+  timezone?: string;
+};
+
+export const organizationsApi = {
+  get: () => apiFetch<OrganizationOut>("/organization"),
+  patch: (body: OrganizationPatch) =>
+    apiFetch<OrganizationOut>("/organization", { method: "PATCH", json: body }),
+};
+
 // ---------- Users (admin only) ----------
 
 export type UserStatus = "active" | "disabled";
@@ -42,6 +68,8 @@ export type UserItem = {
   display_name: string;
   role: Role;
   status: UserStatus;
+  supplier_id?: number | null;
+  supplier_name?: string | null;
   last_login_at: string | null;
 };
 
@@ -50,6 +78,7 @@ export type UserCreate = {
   display_name: string;
   role: Role;
   password?: string;
+  supplier_id?: number | null;
 };
 
 export type UserPatch = {
@@ -57,6 +86,7 @@ export type UserPatch = {
   role?: Role;
   status?: UserStatus;
   password?: string;
+  supplier_id?: number | null;
 };
 
 export const usersApi = {
@@ -187,11 +217,15 @@ export const documentTypesApi = {
 
 export type SupplierStatus = "active" | "inactive";
 
+export type CatalogBrief = { id: number; name: string };
+
 export type SupplierListItem = {
   id: number;
   legal_name: string;
   rfc: string;
   supplier_type: { id: number; name: string; origin: string };
+  sector: CatalogBrief | null;
+  giro: CatalogBrief | null;
   contact_name: string | null;
   contact_email: string | null;
   status: SupplierStatus;
@@ -201,6 +235,8 @@ export type SupplierListItem = {
 };
 
 export type SupplierDetail = SupplierListItem & {
+  contact_phone: string | null;
+  repse_folio: string | null;
   documents_by_type: Array<{
     document_type: { id: number; slug: string; name: string; periodicity: string };
     latest: null | {
@@ -220,10 +256,27 @@ export type SupplierCreate = {
   legal_name: string;
   rfc: string;
   supplier_type_id?: number;
+  sector_id?: number | null;
+  giro_id?: number | null;
   contact_name?: string;
   contact_email?: string;
   contact_phone?: string;
+  repse_folio?: string;
   notes?: string;
+};
+
+export type SupplierPatch = {
+  legal_name?: string;
+  supplier_type_id?: number;
+  sector_id?: number | null;
+  giro_id?: number | null;
+  contact_name?: string;
+  contact_email?: string;
+  contact_phone?: string;
+  repse_folio?: string;
+  status?: SupplierStatus;
+  notes?: string;
+  confirmation_text?: string;
 };
 
 export type CellStatus =
@@ -241,6 +294,7 @@ export type ComplianceCell = {
   document_id: number | null;
   document_count: number;
   coverage_period_start: string | null;
+  type_validated: boolean;
 };
 
 export type MonthlyRequirement = {
@@ -277,14 +331,19 @@ export type ComplianceGrid = {
   year: number;
   monthly_requirements: MonthlyRequirement[];
   one_time_requirements: OneTimeRequirement[];
+  sector?: CatalogBrief | null;
+  giro?: CatalogBrief | null;
+  repse_folio?: string | null;
 };
 
 export const suppliersApi = {
-  list: (params: { q?: string; status?: string; supplier_type_id?: number } = {}) => {
+  list: (params: { q?: string; status?: string; supplier_type_id?: number; sector_id?: number; giro_id?: number } = {}) => {
     const qs = new URLSearchParams();
     if (params.q) qs.set("q", params.q);
     if (params.status) qs.set("status", params.status);
     if (params.supplier_type_id) qs.set("supplier_type_id", String(params.supplier_type_id));
+    if (params.sector_id) qs.set("sector_id", String(params.sector_id));
+    if (params.giro_id) qs.set("giro_id", String(params.giro_id));
     const tail = qs.toString();
     return apiFetch<{ items: SupplierListItem[]; has_more: boolean }>(
       `/suppliers${tail ? `?${tail}` : ""}`
@@ -308,6 +367,7 @@ export type DocumentOut = {
   coverage_period_end: string | null;
   due_date_calculated: string | null;
   due_date_effective: string | null;
+  due_date_override_reason?: string | null;
   status: "valid" | "expiring_soon" | "expired";
   verified: boolean;
   version: number;

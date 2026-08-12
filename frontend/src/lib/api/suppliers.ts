@@ -102,10 +102,10 @@ export function useChangeSupplierType(
         method: "PATCH",
         json: input,
       }),
-    onSuccess: (data, variables, ctx) => {
+    onSuccess: (...args) => {
       qc.invalidateQueries({ queryKey: ["supplier", supplierId] });
       qc.invalidateQueries({ queryKey: ["suppliers"] });
-      options?.onSuccess?.(data, variables, ctx);
+      options?.onSuccess?.(...args);
     },
     ...options,
   });

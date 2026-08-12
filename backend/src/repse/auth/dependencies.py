@@ -23,16 +23,21 @@ class CurrentUser:
     user_id: int
     organization_id: int
     role: str
+    supplier_id: int | None = None
 
 
 def _session_manager(settings: Settings = Depends(get_settings)) -> SessionManager:
     return SessionManager(settings)
 
 
-def current_user(
+async def current_user(
     request: Request,
     sessions: SessionManager = Depends(_session_manager),
 ) -> CurrentUser:
+    # Async on purpose: set_current_tenant() must run in the request task's
+    # context so the tenant contextvar propagates to sync dependencies and
+    # handlers (threadpool runs receive a COPY of the context; a set made
+    # inside a sync dependency would be lost for the handler).
     payload: SessionPayload | None = sessions.read(request)
     if payload is None:
         raise Unauthenticated("Missing or invalid session")
@@ -46,11 +51,20 @@ def current_user(
         user_id=payload.user_id,
         organization_id=payload.organization_id,
         role=payload.role,
+        supplier_id=payload.supplier_id,
     )
 
 
 def current_tenant(user: CurrentUser = Depends(current_user)) -> int:
     return user.organization_id
+
+
+async def require_backoffice(user: CurrentUser = Depends(current_user)) -> CurrentUser:
+    """Guard de routers administrativos (spec 013, FR-008): cualquier rol
+    autenticado excepto supplier; los proveedores solo acceden a /portal."""
+    if user.role == "supplier":
+        raise Forbidden("Role 'supplier' not allowed on back-office endpoints")
+    return user
 
 
 def require_role(*roles: str):  # type: ignore[no-untyped-def]

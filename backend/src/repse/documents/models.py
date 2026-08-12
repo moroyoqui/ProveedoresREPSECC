@@ -21,7 +21,6 @@ from sqlalchemy import (
     SmallInteger,
     String,
     Text,
-    UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -46,7 +45,10 @@ class OcrStatus(StrEnum):
 class Document(Base, TimestampMixin, TenantOwned):
     __tablename__ = "documents"
     __table_args__ = (
-        UniqueConstraint("organization_id", "file_sha256", name="uq_documents_org_sha256"),
+        # Partial unique index defined in migration 0009 (MySQL functional key):
+        # IF(deleted_at IS NULL, file_sha256, NULL) — enforces uniqueness only
+        # for active (non-deleted) documents.  Soft-deleted rows are excluded so
+        # the same file can be re-uploaded after deletion.
         Index(
             "ix_documents_org_supplier_type_period",
             "organization_id", "supplier_id", "document_type_id", "coverage_period_start",

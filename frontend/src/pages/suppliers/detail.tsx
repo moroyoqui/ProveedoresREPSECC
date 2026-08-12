@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 import { useState } from "react";
 import { Pencil, Upload } from "lucide-react";
@@ -19,6 +19,8 @@ export function SupplierDetailPage() {
     coverage_period_start?: string | null;
   }>({});
   const year = new Date().getFullYear();
+
+  const qc = useQueryClient();
 
   const { data, isLoading } = useQuery({
     queryKey: ["supplier", supplierId],
@@ -46,12 +48,11 @@ export function SupplierDetailPage() {
     setShowUpload(true);
   }
 
-  function handleUploadClose(uploaded?: boolean) {
+  function handleUploadClose() {
     setShowUpload(false);
     setUploadPreset({});
-    if (uploaded) {
-      // las queries se invalidan en UploadDialog; aquí solo limpiamos estado local
-    }
+    qc.invalidateQueries({ queryKey: ["supplier", supplierId] });
+    qc.invalidateQueries({ queryKey: ["supplier-compliance", supplierId] });
   }
 
   if (isLoading) return <p className="p-8 text-sm text-neutral-500">Cargando…</p>;
@@ -77,6 +78,31 @@ export function SupplierDetailPage() {
           <p className="mt-1 text-sm text-neutral-600">
             Tipo: <span className="font-medium">{data.supplier_type.name}</span>
           </p>
+          <p className="mt-0.5 text-sm text-neutral-600">
+            Sector:{" "}
+            <span className="font-medium">
+              {data.sector ? data.sector.name : <span className="italic text-neutral-400">Sin clasificar</span>}
+            </span>
+            {data.giro && (
+              <>
+                {" · "}Giro: <span className="font-medium">{data.giro.name}</span>
+              </>
+            )}
+          </p>
+          <p className="mt-0.5 text-sm text-neutral-600">
+            Contacto:{" "}
+            <span className="font-medium">
+              {data.contact_name ?? <span className="italic text-neutral-400">—</span>}
+            </span>
+            {data.contact_email && <> · {data.contact_email}</>}
+            {data.contact_phone && <> · {data.contact_phone}</>}
+          </p>
+          {data.repse_folio && (
+            <p className="mt-0.5 text-sm text-neutral-600">
+              Folio REPSE:{" "}
+              <span className="font-mono font-medium">{data.repse_folio}</span>
+            </p>
+          )}
         </div>
         <div className="flex gap-2">
           <Link to={`/suppliers/${data.id}/edit`}>
@@ -132,6 +158,10 @@ export function SupplierDetailPage() {
             <ComplianceGrid
               data={complianceData}
               onUploadClick={handleUploadClick}
+              onViewerClose={() => {
+                qc.invalidateQueries({ queryKey: ["supplier", supplierId] });
+                qc.invalidateQueries({ queryKey: ["supplier-compliance", supplierId] });
+              }}
             />
           </section>
 

@@ -50,6 +50,7 @@ class CellOut(BaseModel):
     document_id: int | None = None
     document_count: int = 0
     coverage_period_start: date | None = None
+    type_validated: bool = False
 
 
 class MonthlyRequirementOut(BaseModel):

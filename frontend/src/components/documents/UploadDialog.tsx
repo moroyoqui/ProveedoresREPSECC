@@ -1,19 +1,11 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { CheckCircle, XCircle, Loader2, RefreshCcw } from "lucide-react";
+import { CheckCircle, XCircle, Loader2, RefreshCcw, X } from "lucide-react";
 
 import { Button, Card, CardBody, CardHeader, CardTitle, FormField } from "@/components/ui";
 import { ApiError } from "@/lib/api";
 import { documentTypesApi, documentsApi } from "@/lib/api/index";
-
-const ALLOWED_MIME_TYPES = new Set([
-  "application/pdf",
-  "image/png",
-  "image/jpeg",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-]);
-
-const MAX_FILE_BYTES = 20 * 1024 * 1024; // 20 MB (must match backend setting)
+import { UPLOAD_ACCEPT, UPLOAD_MAX_BYTES, validateUploadFile } from "@/lib/uploadConstraints";
 
 type FileStatus = "idle" | "uploading" | "success" | "error";
 
@@ -21,16 +13,6 @@ type FileItem = {
   file: File;
   status: FileStatus;
   error?: string;
-};
-
-function validateFile(file: File): string | null {
-  if (!ALLOWED_MIME_TYPES.has(file.type)) {
-    return `Tipo no permitido: ${file.type || "desconocido"}. Se aceptan PDF, PNG, JPG y DOCX.`;
-  }
-  if (file.size > MAX_FILE_BYTES) {
-    return `El archivo supera el tamaño máximo (${Math.round(MAX_FILE_BYTES / (1024 * 1024))} MB).`;
-  }
-  return null;
 }
 
 function formatBytes(bytes: number): string {
@@ -48,9 +30,8 @@ export function UploadDialog({
   supplierId: number;
   initialDocTypeId?: number | null;
   initialCoverage?: string | null;
-  onClose: (uploaded?: boolean) => void;
+  onClose: () => void;
 }) {
-  const qc = useQueryClient();
   const [files, setFiles] = useState<FileItem[]>([]);
   const [docTypeId, setDocTypeId] = useState<number | null>(initialDocTypeId ?? null);
   const [coverage, setCoverage] = useState<string>(initialCoverage ?? "");
@@ -73,7 +54,7 @@ export function UploadDialog({
     const selected = Array.from(e.target.files ?? []);
     if (selected.length === 0) return;
     const items: FileItem[] = selected.map((file) => {
-      const err = validateFile(file);
+      const err = validateUploadFile(file);
       return { file, status: err ? "error" : "idle", error: err ?? undefined };
     });
     setFiles(items);
@@ -103,6 +84,7 @@ export function UploadDialog({
     setGlobalError(null);
     setIsUploading(true);
     let anySuccess = false;
+    let anyServerError = false;
 
     for (const item of uploadable) {
       setFiles((prev) =>
@@ -122,6 +104,7 @@ export function UploadDialog({
         );
         anySuccess = true;
       } catch (e: unknown) {
+        anyServerError = true;
         let msg = "Error inesperado";
         if (e instanceof ApiError) {
           msg = e.code === "duplicate_file" ? "Archivo duplicado (ya existe)." : e.message;
@@ -134,23 +117,13 @@ export function UploadDialog({
 
     setIsUploading(false);
 
-    if (anySuccess) {
-      qc.invalidateQueries({ queryKey: ["supplier", supplierId] });
-      qc.invalidateQueries({ queryKey: ["supplier-compliance", supplierId] });
+    if (anySuccess && !anyServerError) {
+      onClose();
     }
-
-    const allDone = files.every((f) => f.status === "success" || (f.status !== "idle" && f.status !== "uploading"));
-    const hasFailed = files.some((f) => f.status === "error");
-
-    if (anySuccess && !hasFailed) {
-      onClose(true);
-    }
-    // If there are failures, stay open so the user can see the summary / retry
+    // Si hubo errores de servidor, el diálogo queda abierto para que el usuario vea y reintente.
   }
 
   const successCount = files.filter((f) => f.status === "success").length;
-  const failCount = files.filter((f) => f.status === "error" && !f.error?.startsWith("Tipo") && !f.error?.startsWith("El archivo")).length;
-  const preValidationErrors = files.filter((f) => f.status === "error" && (f.error?.startsWith("Tipo") || f.error?.startsWith("El archivo"))).length;
   const hasRetryable = files.some(
     (f) => f.status === "error" && !f.error?.startsWith("Tipo") && !f.error?.startsWith("El archivo")
   );
@@ -159,8 +132,17 @@ export function UploadDialog({
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-brand-900/40 p-4">
       <Card className="w-full max-w-lg">
-        <CardHeader>
+        <CardHeader className="flex items-center justify-between">
           <CardTitle>Subir documento</CardTitle>
+          <button
+            type="button"
+            onClick={() => onClose()}
+            disabled={isUploading}
+            className="rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 disabled:opacity-40"
+            aria-label="Cerrar"
+          >
+            <X size={18} />
+          </button>
         </CardHeader>
         <CardBody>
           {globalError && (
@@ -229,13 +211,13 @@ export function UploadDialog({
                 id="upload-file"
                 type="file"
                 multiple
-                accept="application/pdf,image/png,image/jpeg,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                accept={UPLOAD_ACCEPT}
                 className="mt-1.5 block w-full text-sm"
                 onChange={handleFileChange}
                 disabled={isUploading}
               />
               <p className="mt-1 text-xs text-neutral-400">
-                PDF, PNG, JPG o DOCX · máx. {Math.round(MAX_FILE_BYTES / (1024 * 1024))} MB por archivo
+                PDF, PNG, JPG o DOCX · máx. {Math.round(UPLOAD_MAX_BYTES / (1024 * 1024))} MB por archivo
               </p>
             </div>
 
@@ -269,7 +251,7 @@ export function UploadDialog({
                   Reintentar fallidos
                 </Button>
               )}
-              <Button type="button" variant="ghost" onClick={() => onClose(hasAtLeastOneSuccess)} disabled={isUploading}>
+              <Button type="button" variant="ghost" onClick={() => onClose()} disabled={isUploading}>
                 {hasAtLeastOneSuccess ? "Cerrar" : "Cancelar"}
               </Button>
               <Button

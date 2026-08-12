@@ -35,26 +35,24 @@ def test_aggregate_counts_only_requirements_of_supplier_type(
 
     set_current_tenant(session_user.organization_id)
 
-    # Borra todos los requirements del SupplierType del proveedor; deja sólo opinion-sat.
+    # Retira todos los requirements del SupplierType del proveedor; deja sólo
+    # opinion-sat activo (reactivando el existente — la unique key
+    # uq_supplier_type_doc_req impide insertar un duplicado).
+    opinion_sat = db_session.execute(
+        select(DocumentType).where(DocumentType.slug == "opinion-sat")
+    ).scalar_one()
+
     all_reqs = db_session.execute(
         select(SupplierTypeDocumentRequirement).where(
             SupplierTypeDocumentRequirement.supplier_type_id == seeded_supplier.supplier_type_id
         )
     ).scalars().all()
     for r in all_reqs:
-        r.status = RequirementStatus.RETIRED
-
-    opinion_sat = db_session.execute(
-        select(DocumentType).where(DocumentType.slug == "opinion-sat")
-    ).scalar_one()
-
-    req = SupplierTypeDocumentRequirement(
-        organization_id=session_user.organization_id,
-        supplier_type_id=seeded_supplier.supplier_type_id,
-        document_type_id=opinion_sat.id,
-        status=RequirementStatus.ACTIVE,
-    )
-    db_session.add(req)
+        r.status = (
+            RequirementStatus.ACTIVE
+            if r.document_type_id == opinion_sat.id
+            else RequirementStatus.RETIRED
+        )
     db_session.commit()
 
     agg = aggregate(db_session, supplier_id=seeded_supplier.id)

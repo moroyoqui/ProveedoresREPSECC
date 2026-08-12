@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from repse.auth.dependencies import CurrentUser, current_user, require_role
+from repse.common.cache import bump_tenant_version
 from repse.db.session import get_db
 from repse.errors import NotFound
 from repse.organizations.models import Organization
@@ -44,5 +45,6 @@ def update_organization(
     if body.timezone is not None:
         org.timezone = body.timezone
     db.commit()
+    bump_tenant_version(user.organization_id)  # FR-021a: invalida cache del tablero
     db.refresh(org)
     return org

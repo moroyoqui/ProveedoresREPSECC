@@ -2,7 +2,7 @@ import { ExternalLink, Upload } from "lucide-react";
 
 import type { OneTimeRequirement } from "@/lib/api/index";
 import { Button } from "@/components/ui";
-import { ComplianceCell, type UploadClickParams } from "./ComplianceCell";
+import { ComplianceCell, type UploadClickParams, type ViewerClickParams } from "./ComplianceCell";
 
 function fmt(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString("es-MX", {
@@ -16,9 +16,10 @@ type OneTimeRequirementsProps = {
   items: OneTimeRequirement[];
   onDocumentClick?: (documentId: number) => void;
   onUploadClick?: (params: UploadClickParams) => void;
+  onViewerClick?: (params: ViewerClickParams) => void;
 };
 
-export function OneTimeRequirements({ items, onDocumentClick, onUploadClick }: OneTimeRequirementsProps) {
+export function OneTimeRequirements({ items, onDocumentClick, onUploadClick, onViewerClick }: OneTimeRequirementsProps) {
   if (items.length === 0) return null;
 
   return (
@@ -37,8 +38,12 @@ export function OneTimeRequirements({ items, onDocumentClick, onUploadClick }: O
               document_id={item.document_id}
               document_type_id={item.document_type.id}
               coverage_period_start={null}
-              onDocumentClick={onDocumentClick}
-              onUploadClick={onUploadClick}
+              {...(onViewerClick
+                ? { onViewerClick: (params) => onViewerClick(params) }
+                : {
+                    ...(onDocumentClick ? { onDocumentClick } : {}),
+                    ...(onUploadClick ? { onUploadClick } : {}),
+                  })}
             />
 
             <div className="min-w-0 flex-1">
@@ -52,7 +57,17 @@ export function OneTimeRequirements({ items, onDocumentClick, onUploadClick }: O
               )}
             </div>
 
-            {item.document_id != null && onDocumentClick ? (
+            {onViewerClick ? (
+              <Button
+                variant="ghost"
+                className="shrink-0 px-2 py-1 text-xs"
+                onClick={() => onViewerClick({ document_type_id: item.document_type.id, coverage_period_start: null })}
+                title={item.document_id != null ? "Ver documento" : "Subir documento"}
+              >
+                {item.document_id != null ? <ExternalLink size={14} /> : <Upload size={14} />}
+                {item.document_id != null ? "Ver" : "Subir"}
+              </Button>
+            ) : item.document_id != null && onDocumentClick ? (
               <Button
                 variant="ghost"
                 className="shrink-0 px-2 py-1 text-xs"

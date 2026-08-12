@@ -85,7 +85,7 @@ export function ComplianceCell({
   );
 
   const canOpenViewer =
-    (status === "validated" || status === "submitted" || status === "expired") &&
+    status !== "future" &&
     document_type_id != null &&
     onViewerClick != null;
 
@@ -96,7 +96,7 @@ export function ComplianceCell({
     !canOpenViewer;
 
   const canUpload =
-    (status === "missing" || status === "pending") &&
+    (status === "missing" || status === "pending" || status === "expired") &&
     document_type_id != null &&
     onUploadClick != null;
 

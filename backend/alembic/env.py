@@ -22,13 +22,15 @@ import repse.supplier_types.models  # noqa: F401
 import repse.document_types.models  # noqa: F401
 import repse.documents.models  # noqa: F401
 import repse.audit.models  # noqa: F401
+import repse.compliance.models  # noqa: F401
+import repse.alerts.models  # noqa: F401
 
 config = context.config
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-config.set_main_option("sqlalchemy.url", get_settings().db_url)
+config.set_main_option("sqlalchemy.url", get_settings().db_url.replace("%", "%%"))
 
 target_metadata = Base.metadata
 

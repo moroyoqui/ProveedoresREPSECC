@@ -71,3 +71,17 @@ export function useDocumentsList(filters: DocumentListFilters) {
     staleTime: 30_000,
   });
 }
+
+export async function validateDocumentType(
+  supplierId: number,
+  documentTypeId: number,
+  coveragePeriodStart: string | null,
+): Promise<void> {
+  await apiFetch<void>(`/suppliers/${supplierId}/compliance/validate`, {
+    method: "POST",
+    json: {
+      document_type_id: documentTypeId,
+      coverage_period_start: coveragePeriodStart,
+    },
+  });
+}

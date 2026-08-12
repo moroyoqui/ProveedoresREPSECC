@@ -8,13 +8,14 @@
 import { createContext, useContext, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 
-export type Role = "admin" | "manager" | "viewer";
+export type Role = "admin" | "manager" | "viewer" | "supplier";
 
 export type AuthUser = {
   id: number;
   email: string;
   displayName: string;
   role: Role;
+  supplierId?: number | null;
   organization: {
     id: number;
     legalName: string;

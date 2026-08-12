@@ -38,6 +38,8 @@ def list_suppliers(
     q: str | None = Query(None),
     status: str = Query("active"),
     supplier_type_id: list[int] | None = Query(None),
+    sector_id: int | None = Query(None),
+    giro_id: int | None = Query(None),
     limit: int = Query(20, ge=1, le=100),
     user: CurrentUser = Depends(current_user),
     db: Session = Depends(get_db),
@@ -50,6 +52,10 @@ def list_suppliers(
         stmt = stmt.where(or_(Supplier.legal_name.ilike(pat), Supplier.rfc.ilike(pat)))
     if supplier_type_id:
         stmt = stmt.where(Supplier.supplier_type_id.in_(supplier_type_id))
+    if sector_id is not None:
+        stmt = stmt.where(Supplier.sector_id == sector_id)
+    if giro_id is not None:
+        stmt = stmt.where(Supplier.giro_id == giro_id)
     suppliers = db.execute(stmt.limit(limit + 1)).scalars().all()
     has_more = len(suppliers) > limit
     suppliers = suppliers[:limit]
@@ -168,6 +174,18 @@ def _counts_for(db: Session, supplier: Supplier) -> tuple[dict, int]:
     return dict(agg["counts"]), agg["percent"]
 
 
+def _sector_dict(supplier: Supplier) -> dict | None:
+    if supplier.sector_id is None or supplier.sector is None:
+        return None
+    return {"id": supplier.sector.id, "name": supplier.sector.name}
+
+
+def _giro_dict(supplier: Supplier) -> dict | None:
+    if supplier.giro_id is None or supplier.giro is None:
+        return None
+    return {"id": supplier.giro.id, "name": supplier.giro.name}
+
+
 def _serialize_list_item(db: Session, supplier: Supplier) -> SupplierListItem:
     st = db.get(SupplierType, supplier.supplier_type_id)
     counts, pct = _counts_for(db, supplier)
@@ -176,6 +194,8 @@ def _serialize_list_item(db: Session, supplier: Supplier) -> SupplierListItem:
         legal_name=supplier.legal_name,
         rfc=supplier.rfc,
         supplier_type={"id": st.id, "name": st.name, "origin": st.origin.value} if st else {},
+        sector=_sector_dict(supplier),
+        giro=_giro_dict(supplier),
         contact_name=supplier.contact_name,
         contact_email=supplier.contact_email,
         status=supplier.status,
@@ -206,7 +226,10 @@ def _serialize_detail(db: Session, supplier: Supplier) -> SupplierDetailOut:
                 Document.supplier_id == supplier.id,
                 Document.document_type_id == dt.id,
                 Document.is_latest.is_(True),
+                Document.deleted_at.is_(None),
             )
+            .order_by(Document.created_at.desc())
+            .limit(1)
         ).scalar_one_or_none()
 
         item: dict = {
@@ -238,6 +261,12 @@ def _serialize_detail(db: Session, supplier: Supplier) -> SupplierDetailOut:
         legal_name=supplier.legal_name,
         rfc=supplier.rfc,
         supplier_type={"id": st.id, "name": st.name, "origin": st.origin.value} if st else {},
+        sector=_sector_dict(supplier),
+        giro=_giro_dict(supplier),
+        contact_name=supplier.contact_name,
+        contact_email=supplier.contact_email,
+        contact_phone=supplier.contact_phone,
+        repse_folio=supplier.repse_folio,
         status=supplier.status,
         compliance_percent=pct,
         counts=counts,

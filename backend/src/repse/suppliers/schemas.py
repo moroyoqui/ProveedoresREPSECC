@@ -20,6 +20,16 @@ class SupplierTypeBrief(BaseModel):
     origin: str
 
 
+class SectorBrief(BaseModel):
+    id: int
+    name: str
+
+
+class GiroBrief(BaseModel):
+    id: int
+    name: str
+
+
 class SupplierCounts(BaseModel):
     valid: int = 0
     expiring_soon: int = 0
@@ -31,10 +41,13 @@ class SupplierIn(BaseModel):
     legal_name: str = Field(..., min_length=3, max_length=255)
     rfc: str = Field(..., min_length=12, max_length=13)
     supplier_type_id: int | None = None
-    contact_name: str | None = Field(None, max_length=255)
+    sector_id: int | None = None
+    giro_id: int | None = None
+    contact_name: str | None = Field(None, max_length=120)
     contact_email: EmailStr | None = None
     contact_phone: str | None = Field(None, max_length=32)
     notes: str | None = None
+    repse_folio: str | None = Field(None, max_length=60)
 
     @field_validator("rfc")
     @classmethod
@@ -47,10 +60,24 @@ class SupplierIn(BaseModel):
 
 class SupplierPatch(BaseModel):
     legal_name: str | None = Field(None, min_length=3, max_length=255)
+    rfc: str | None = Field(None, min_length=12, max_length=13)
     supplier_type_id: int | None = None
-    contact_name: str | None = Field(None, max_length=255)
+
+    @field_validator("rfc")
+    @classmethod
+    def _rfc_format(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        normalized = v.strip().upper()
+        if not RFC_RE.match(normalized):
+            raise ValueError("RFC format invalid")
+        return normalized
+    sector_id: int | None = None
+    giro_id: int | None = None
+    contact_name: str | None = Field(None, max_length=120)
     contact_email: EmailStr | None = None
     contact_phone: str | None = Field(None, max_length=32)
+    repse_folio: str | None = Field(None, max_length=60)
     status: SupplierStatus | None = None
     notes: str | None = None
     # Texto que el usuario debe escribir ("eliminar", case-insensitive, trimmed)
@@ -83,6 +110,8 @@ class SupplierListItem(BaseModel):
     legal_name: str
     rfc: str
     supplier_type: SupplierTypeBrief
+    sector: SectorBrief | None = None
+    giro: GiroBrief | None = None
     contact_name: str | None
     contact_email: EmailStr | None
     status: SupplierStatus
@@ -120,6 +149,12 @@ class SupplierDetailOut(BaseModel):
     legal_name: str
     rfc: str
     supplier_type: SupplierTypeBrief
+    sector: SectorBrief | None = None
+    giro: GiroBrief | None = None
+    contact_name: str | None = None
+    contact_email: EmailStr | None = None
+    contact_phone: str | None = None
+    repse_folio: str | None = None
     status: SupplierStatus
     compliance_percent: int = 0
     counts: SupplierCounts = SupplierCounts()

@@ -1,4 +1,9 @@
-"""T039 spec 001: duplicate-file detection by sha256 within a tenant."""
+"""Duplicate-file detection by sha256.
+
+Contrato vigente (specs 009 FR-027 / 012): el duplicado solo se rechaza dentro
+de la misma celda (supplier + tipo + período); el mismo contenido en otro
+período se acepta — la unicidad en disco la garantiza el sufijo UUID.
+"""
 
 from __future__ import annotations
 
@@ -25,12 +30,19 @@ def test_duplicate_file_rejected(client_with_session, seeded_supplier, opinion_s
     )
     assert first.status_code == 201
 
-    second = client_with_session.post(
+    # Mismo contenido en la MISMA celda → 409 duplicate_file.
+    same_cell = client_with_session.post(
+        f"/api/v1/suppliers/{seeded_supplier.id}/documents",
+        files={"file": ("b.pdf", io.BytesIO(payload), "application/pdf")},
+        data=data,
+    )
+    assert same_cell.status_code == 409
+    assert same_cell.json()["error"]["details"]["code"] == "duplicate_file"
+
+    # Mismo contenido en OTRO período → 201 (specs 009/012: sin dedup global).
+    other_period = client_with_session.post(
         f"/api/v1/suppliers/{seeded_supplier.id}/documents",
         files={"file": ("b.pdf", io.BytesIO(payload), "application/pdf")},
         data={**data, "coverage_period_start": "2026-05-01"},
     )
-    assert second.status_code == 409
-    body = second.json()
-    assert body["error"]["code"] == "duplicate_file"
-    assert "existing_document_id" in body["error"]["details"]
+    assert other_period.status_code == 201

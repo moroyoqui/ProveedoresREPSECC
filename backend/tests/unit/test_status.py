@@ -4,15 +4,18 @@ from datetime import date
 
 import pytest
 
+import repse.giros.models  # noqa: F401  — mapper config: Supplier.relationship("Giro")
+import repse.sectors.models  # noqa: F401  — mapper config: Supplier.relationship("Sector")
 from repse.documents.models import Document, DocumentStatus
 from repse.documents.status import compute_status
 
 
 def _doc(due_effective: date | None = None, due_calculated: date | None = None) -> Document:
     """Build a Document stub without touching the DB."""
-    doc = Document.__new__(Document)
-    doc.due_date_effective = due_effective  # type: ignore[assignment]
-    doc.due_date_calculated = due_calculated  # type: ignore[assignment]
+    doc = Document(
+        due_date_effective=due_effective,
+        due_date_calculated=due_calculated,
+    )
     return doc
 
 

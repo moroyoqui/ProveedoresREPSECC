@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { KeyRound, Plus, ShieldOff, UserCheck } from "lucide-react";
+import { Building2, KeyRound, Plus, ShieldOff, UserCheck } from "lucide-react";
 
 import {
   Badge,
@@ -10,6 +10,7 @@ import {
   CardHeader,
   CardTitle,
   FormField,
+  IconButton,
   Table,
   TBody,
   TD,
@@ -18,20 +19,23 @@ import {
   TR,
 } from "@/components/ui";
 import { ApiError } from "@/lib/api";
-import { usersApi, type Role, type UserItem } from "@/lib/api/index";
+import { usersApi, suppliersApi, type Role, type UserItem } from "@/lib/api/index";
 import { useAuth } from "@/lib/auth";
 
 const ROLE_LABEL: Record<Role, string> = {
   admin: "Administrador",
   manager: "Gestor",
   viewer: "Consulta",
+  supplier: "Proveedor",
 };
 
 export function UsersListPage() {
   const { user: currentUser } = useAuth();
   const qc = useQueryClient();
   const [showCreate, setShowCreate] = useState(false);
+  const [detailTarget, setDetailTarget] = useState<UserItem | null>(null);
   const [resetTarget, setResetTarget] = useState<UserItem | null>(null);
+  const [assignTarget, setAssignTarget] = useState<UserItem | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ["users"],
@@ -65,7 +69,7 @@ export function UsersListPage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl p-8">
+    <div className="mx-auto max-w-7xl p-8">
       <header className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-brand-700">Usuarios</h1>
@@ -94,15 +98,23 @@ export function UsersListPage() {
               <TH>Nombre</TH>
               <TH>Correo</TH>
               <TH>Rol</TH>
+              <TH>Proveedor</TH>
               <TH>Estado</TH>
-              <TH>Último acceso</TH>
               <TH className="text-right">Acciones</TH>
             </TR>
           </THead>
           <TBody>
             {data.items.map((u) => (
               <TR key={u.id}>
-                <TD className="font-medium text-brand-700">{u.display_name}</TD>
+                <TD>
+                  <button
+                    type="button"
+                    className="font-medium text-brand-700 underline underline-offset-2 hover:text-brand-500 transition-colors"
+                    onClick={() => setDetailTarget(u)}
+                  >
+                    {u.display_name}
+                  </button>
+                </TD>
                 <TD className="text-neutral-600">{u.email}</TD>
                 <TD>
                   <select
@@ -114,42 +126,55 @@ export function UsersListPage() {
                     <option value="admin">{ROLE_LABEL.admin}</option>
                     <option value="manager">{ROLE_LABEL.manager}</option>
                     <option value="viewer">{ROLE_LABEL.viewer}</option>
+                    <option value="supplier" disabled>
+                      {ROLE_LABEL.supplier}
+                    </option>
                   </select>
+                </TD>
+                <TD className="text-sm text-neutral-600">
+                  {u.role === "supplier"
+                    ? (u.supplier_name ?? (
+                        <span className="text-status-expired text-xs">Sin asignar</span>
+                      ))
+                    : "—"}
                 </TD>
                 <TD>
                   <Badge tone={u.status === "active" ? "valid" : "missing"}>
                     {u.status === "active" ? "Activo" : "Deshabilitado"}
                   </Badge>
                 </TD>
-                <TD className="text-sm text-neutral-500">
-                  {u.last_login_at ? new Date(u.last_login_at).toLocaleString("es-MX") : "—"}
-                </TD>
                 <TD className="text-right">
-                  <div className="flex justify-end gap-2">
-                    <Button size="sm" variant="ghost" onClick={() => setResetTarget(u)}>
-                      <KeyRound size={14} />
-                      Contraseña
-                    </Button>
+                  <div className="flex justify-end gap-1">
+                    {u.role === "supplier" && (
+                      <IconButton
+                        icon={<Building2 size={16} />}
+                        label="Asignar proveedor"
+                        variant="ghost"
+                        onClick={() => setAssignTarget(u)}
+                      />
+                    )}
+                    <IconButton
+                      icon={<KeyRound size={16} />}
+                      label="Cambiar contraseña"
+                      variant="ghost"
+                      onClick={() => setResetTarget(u)}
+                    />
                     {u.status === "active" ? (
-                      <Button
-                        size="sm"
+                      <IconButton
+                        icon={<ShieldOff size={16} />}
+                        label="Deshabilitar"
                         variant="secondary"
                         disabled={u.id === currentUser?.id || disable.isPending}
                         onClick={() => disable.mutate(u.id)}
-                      >
-                        <ShieldOff size={14} />
-                        Deshabilitar
-                      </Button>
+                      />
                     ) : (
-                      <Button
-                        size="sm"
+                      <IconButton
+                        icon={<UserCheck size={16} />}
+                        label="Habilitar"
                         variant="secondary"
                         disabled={enable.isPending}
                         onClick={() => enable.mutate(u.id)}
-                      >
-                        <UserCheck size={14} />
-                        Habilitar
-                      </Button>
+                      />
                     )}
                   </div>
                 </TD>
@@ -160,8 +185,14 @@ export function UsersListPage() {
       )}
 
       {showCreate && <CreateUserDialog onClose={() => setShowCreate(false)} />}
+      {detailTarget && (
+        <UserDetailDrawer user={detailTarget} onClose={() => setDetailTarget(null)} />
+      )}
       {resetTarget && (
         <ResetPasswordDialog user={resetTarget} onClose={() => setResetTarget(null)} />
+      )}
+      {assignTarget && (
+        <ChangeSupplierDialog user={assignTarget} onClose={() => setAssignTarget(null)} />
       )}
     </div>
   );
@@ -172,8 +203,15 @@ function CreateUserDialog({ onClose }: { onClose: () => void }) {
   const [email, setEmail] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [role, setRole] = useState<Role>("viewer");
+  const [supplierId, setSupplierId] = useState<number | null>(null);
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+
+  const { data: suppliersData } = useQuery({
+    queryKey: ["suppliers", "active"],
+    queryFn: () => suppliersApi.list({ status: "active" }),
+    enabled: role === "supplier",
+  });
 
   const create = useMutation({
     mutationFn: () => {
@@ -183,6 +221,7 @@ function CreateUserDialog({ onClose }: { onClose: () => void }) {
         role,
       };
       if (password) body.password = password;
+      if (role === "supplier") body.supplier_id = supplierId;
       return usersApi.create(body);
     },
     onSuccess: () => {
@@ -200,7 +239,10 @@ function CreateUserDialog({ onClose }: { onClose: () => void }) {
     },
   });
 
-  const canSubmit = email.trim().length > 0 && displayName.trim().length > 0;
+  const canSubmit =
+    email.trim().length > 0 &&
+    displayName.trim().length > 0 &&
+    (role !== "supplier" || supplierId !== null);
 
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-brand-900/40 p-4">
@@ -232,13 +274,38 @@ function CreateUserDialog({ onClose }: { onClose: () => void }) {
             <select
               className="h-10 rounded-md border border-neutral-300 bg-white px-3 text-sm"
               value={role}
-              onChange={(e) => setRole(e.target.value as Role)}
+              onChange={(e) => {
+                setRole(e.target.value as Role);
+                setSupplierId(null);
+              }}
             >
               <option value="admin">{ROLE_LABEL.admin}</option>
               <option value="manager">{ROLE_LABEL.manager}</option>
               <option value="viewer">{ROLE_LABEL.viewer}</option>
+              <option value="supplier">{ROLE_LABEL.supplier}</option>
             </select>
           </div>
+          {role === "supplier" && (
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-brand-700">
+                Empresa proveedora <span className="text-status-expired">*</span>
+              </label>
+              <select
+                className="h-10 rounded-md border border-neutral-300 bg-white px-3 text-sm"
+                value={supplierId ?? ""}
+                onChange={(e) =>
+                  setSupplierId(e.target.value ? Number(e.target.value) : null)
+                }
+              >
+                <option value="">— Seleccionar empresa —</option>
+                {suppliersData?.items.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.legal_name} ({s.rfc})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <FormField
             label="Contraseña (opcional)"
             type="password"
@@ -306,6 +373,123 @@ function ResetPasswordDialog({ user, onClose }: { user: UserItem; onClose: () =>
               onClick={() => reset.mutate()}
             >
               {reset.isPending ? "Guardando…" : "Guardar"}
+            </Button>
+          </div>
+        </CardBody>
+      </Card>
+    </div>
+  );
+}
+
+function ChangeSupplierDialog({ user, onClose }: { user: UserItem; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [supplierId, setSupplierId] = useState<number | null>(user.supplier_id ?? null);
+  const [error, setError] = useState<string | null>(null);
+
+  const { data: suppliersData } = useQuery({
+    queryKey: ["suppliers", "active"],
+    queryFn: () => suppliersApi.list({ status: "active" }),
+  });
+
+  const assign = useMutation({
+    mutationFn: () => usersApi.update(user.id, { supplier_id: supplierId }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["users"] });
+      onClose();
+    },
+    onError: (e: unknown) => {
+      setError(e instanceof ApiError ? e.message : "Error inesperado");
+    },
+  });
+
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-brand-900/40 p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle>Asignar proveedor</CardTitle>
+        </CardHeader>
+        <CardBody className="space-y-4">
+          <p className="text-sm text-neutral-600">
+            Usuario: <span className="font-medium">{user.email}</span>
+          </p>
+          {error && (
+            <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-status-expired">{error}</p>
+          )}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-brand-700">
+              Empresa proveedora <span className="text-status-expired">*</span>
+            </label>
+            <select
+              className="h-10 rounded-md border border-neutral-300 bg-white px-3 text-sm"
+              value={supplierId ?? ""}
+              onChange={(e) => setSupplierId(e.target.value ? Number(e.target.value) : null)}
+            >
+              <option value="">— Seleccionar empresa —</option>
+              {suppliersData?.items.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.legal_name} ({s.rfc})
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex justify-end gap-3">
+            <Button variant="ghost" onClick={onClose}>
+              Cancelar
+            </Button>
+            <Button
+              disabled={supplierId === null || assign.isPending}
+              onClick={() => assign.mutate()}
+            >
+              {assign.isPending ? "Guardando…" : "Guardar"}
+            </Button>
+          </div>
+        </CardBody>
+      </Card>
+    </div>
+  );
+}
+
+function UserDetailDrawer({ user, onClose }: { user: UserItem; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-brand-900/40 p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle>Detalle del usuario</CardTitle>
+        </CardHeader>
+        <CardBody className="space-y-4">
+          <dl className="space-y-3 text-sm">
+            <div className="flex gap-2">
+              <dt className="w-28 shrink-0 font-medium text-neutral-500">Nombre</dt>
+              <dd className="text-neutral-800">{user.display_name}</dd>
+            </div>
+            <div className="flex gap-2">
+              <dt className="w-28 shrink-0 font-medium text-neutral-500">Correo</dt>
+              <dd className="text-neutral-800">{user.email}</dd>
+            </div>
+            <div className="flex gap-2">
+              <dt className="w-28 shrink-0 font-medium text-neutral-500">Rol</dt>
+              <dd className="text-neutral-800">{ROLE_LABEL[user.role]}</dd>
+            </div>
+            <div className="flex gap-2">
+              <dt className="w-28 shrink-0 font-medium text-neutral-500">Estado</dt>
+              <dd>
+                <Badge tone={user.status === "active" ? "valid" : "missing"}>
+                  {user.status === "active" ? "Activo" : "Deshabilitado"}
+                </Badge>
+              </dd>
+            </div>
+            <div className="flex gap-2">
+              <dt className="w-28 shrink-0 font-medium text-neutral-500">Proveedor</dt>
+              <dd className="text-neutral-800">
+                {user.role === "supplier"
+                  ? (user.supplier_name ?? <span className="text-status-expired text-xs">Sin asignar</span>)
+                  : "—"}
+              </dd>
+            </div>
+          </dl>
+          <div className="flex justify-end">
+            <Button variant="ghost" onClick={onClose}>
+              Cerrar
             </Button>
           </div>
         </CardBody>

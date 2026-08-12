@@ -28,8 +28,9 @@ COOKIE_KWARGS = {
 class SessionPayload:
     user_id: int
     organization_id: int
-    role: str  # "admin" | "manager" | "viewer"
+    role: str  # "admin" | "manager" | "viewer" | "supplier"
     expires_at: datetime
+    supplier_id: int | None = None
 
 
 class SessionManager:
@@ -46,6 +47,7 @@ class SessionManager:
                 "organization_id": payload.organization_id,
                 "role": payload.role,
                 "expires_at": payload.expires_at.isoformat(),
+                "supplier_id": payload.supplier_id,
             }
         )
         response.set_cookie(
@@ -70,11 +72,13 @@ class SessionManager:
         if not isinstance(payload, dict):
             return None
         try:
+            raw_sid = payload.get("supplier_id")
             return SessionPayload(
                 user_id=int(payload["user_id"]),
                 organization_id=int(payload["organization_id"]),
                 role=str(payload["role"]),
                 expires_at=datetime.fromisoformat(str(payload["expires_at"])),
+                supplier_id=int(raw_sid) if raw_sid is not None else None,
             )
         except (KeyError, ValueError, TypeError):
             return None

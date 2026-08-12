@@ -115,7 +115,7 @@ def test_preview_returns_requires_confirmation_when_docs_in_current_year(
     assert body["requires_confirmation"] is True
     assert body["affected_count"] == 1
     assert body["affected_documents"][0]["id"] == doc.id
-    assert body["affected_documents"][0]["document_type"] == "Opinión de cumplimiento SAT"
+    assert body["affected_documents"][0]["document_type"] == "Opinión de cumplimiento SAT (32-D)"
     assert body["affected_documents"][0]["coverage_period"] is not None
     assert body["affected_documents"][0]["due_date_effective"] is not None
 
@@ -192,7 +192,7 @@ def test_patch_without_confirmation_returns_409_when_docs_in_year(
     )
     assert res.status_code == 409
     body = res.json()
-    assert body["error"]["code"] == "confirmation_required"
+    assert body["error"]["details"]["code"] == "confirmation_required"
     assert body["error"]["details"]["affected_count"] == 1
     assert body["error"]["details"]["affected_documents"]
 
@@ -258,4 +258,4 @@ def test_patch_with_invalid_confirmation_returns_422(
     )
     assert res.status_code == 422
     body = res.json()
-    assert body["error"]["code"] == "invalid_confirmation"
+    assert body["error"]["details"]["code"] == "invalid_confirmation"

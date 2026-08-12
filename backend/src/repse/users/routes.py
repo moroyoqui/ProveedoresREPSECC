@@ -10,6 +10,7 @@ from repse.auth.dependencies import CurrentUser, current_user, require_role
 from repse.auth.passwords import hash_password
 from repse.db.session import get_db
 from repse.errors import Conflict, NotFound
+from repse.suppliers.models import Supplier
 from repse.users.models import Role, User, UserStatus
 from repse.users.schemas import UserCreate, UserOut, UserPatch
 
@@ -21,9 +22,16 @@ def list_users(
     user: CurrentUser = Depends(current_user),
     db: Session = Depends(get_db),
 ) -> dict:
-    rows = db.execute(select(User).order_by(User.email)).scalars().all()
+    rows = db.execute(
+        select(User, Supplier.legal_name.label("supplier_name"))
+        .outerjoin(Supplier, User.supplier_id == Supplier.id)
+        .order_by(User.email)
+    ).all()
     return {
-        "items": [UserOut.model_validate(u).model_dump() for u in rows],
+        "items": [
+            {**UserOut.model_validate(u).model_dump(), "supplier_name": sname}
+            for u, sname in rows
+        ],
         "next_cursor": None,
         "has_more": False,
     }
@@ -38,6 +46,8 @@ def create_user(
     existing = db.execute(select(User).where(User.email == body.email.lower())).scalar_one_or_none()
     if existing is not None:
         raise Conflict("Email already exists in this organization", details={"code": "email_exists"})
+    if body.role == Role.SUPPLIER:
+        _validate_supplier_ownership(db, body.supplier_id, user.organization_id)
     new = User(
         organization_id=user.organization_id,
         email=body.email.lower(),
@@ -45,6 +55,7 @@ def create_user(
         role=body.role,
         status=UserStatus.ACTIVE,
         password_hash=hash_password(body.password) if body.password else None,
+        supplier_id=body.supplier_id if body.role == Role.SUPPLIER else None,
     )
     db.add(new)
     db.commit()
@@ -68,7 +79,16 @@ def update_user(
         # Disallow demoting the last admin.
         if row.role is Role.ADMIN and body.role is not Role.ADMIN:
             _guard_last_admin(db, actor.organization_id, exclude_user_id=row.id)
+        if body.role == Role.SUPPLIER:
+            sid = body.supplier_id if body.supplier_id is not None else row.supplier_id
+            _validate_supplier_ownership(db, sid, actor.organization_id)
+            row.supplier_id = sid
+        elif row.role == Role.SUPPLIER and body.role != Role.SUPPLIER:
+            row.supplier_id = None
         row.role = body.role
+    elif body.supplier_id is not None and row.role == Role.SUPPLIER:
+        _validate_supplier_ownership(db, body.supplier_id, actor.organization_id)
+        row.supplier_id = body.supplier_id
     if body.status is not None:
         if body.status is UserStatus.DISABLED and row.role is Role.ADMIN:
             _guard_last_admin(db, actor.organization_id, exclude_user_id=row.id)
@@ -94,6 +114,14 @@ def deactivate_user(
     row.status = UserStatus.DISABLED
     db.commit()
     return Response(status_code=204)
+
+
+def _validate_supplier_ownership(db: Session, supplier_id: int | None, organization_id: int) -> None:
+    if supplier_id is None:
+        raise NotFound("supplier_id is required for supplier role")
+    s = db.get(Supplier, supplier_id)
+    if s is None or s.organization_id != organization_id:
+        raise NotFound("Supplier not found")
 
 
 def _guard_last_admin(db: Session, organization_id: int, *, exclude_user_id: int) -> None:

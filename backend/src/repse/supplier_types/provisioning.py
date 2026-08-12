@@ -10,9 +10,11 @@ from dataclasses import dataclass
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from repse.alerts.models import AlertConfig
 from repse.db.tenant_filter import with_admin_scope
 from repse.document_types.models import DocumentType, DocumentTypeOrigin, DocumentTypeStatus
 from repse.logging import get_logger
+from repse.organizations.models import Organization
 from repse.supplier_types.models import (
     RequirementStatus,
     SupplierType,
@@ -93,6 +95,22 @@ def provision_organization(db: Session, organization_id: int) -> ProvisioningRes
             )
             created += 1
         db.flush()
+
+        # Seed the per-org alert configuration (spec 002, FR-007). Idempotent.
+        existing_cfg = db.execute(
+            select(AlertConfig).where(AlertConfig.organization_id == organization_id)
+        ).scalar_one_or_none()
+        if existing_cfg is None:
+            org = db.execute(
+                select(Organization).where(Organization.id == organization_id)
+            ).scalar_one()
+            db.add(
+                AlertConfig(
+                    organization_id=organization_id,
+                    default_recipient_emails=[org.contact_email],
+                )
+            )
+            db.flush()
 
         return ProvisioningResult(
             organization_id=organization_id,
