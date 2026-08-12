@@ -3,10 +3,10 @@ import type { CellStatus } from "@/lib/api/index";
 const COLOR: Record<CellStatus, string> = {
   validated: "bg-green-500",
   submitted: "bg-yellow-400",
-  expired: "bg-red-700",
-  missing: "bg-red-500",
+  expired: "bg-status-expired",
+  missing: "bg-status-missing",
   pending: "bg-gray-300",
-  future: "bg-gray-200",
+  future: "border-2 border-neutral-500",
   not_required: "",
 };
 
@@ -63,14 +63,8 @@ export function ComplianceCell({
   const dotSize = size === "sm" ? "h-3 w-3" : "h-4 w-4";
 
   if (status === "not_required") {
-    return (
-      <span
-        role="img"
-        aria-label={month ? `${MONTH_NAMES[month - 1]}: no aplica` : "No aplica"}
-        title="No aplica"
-        className={`inline-block ${dotSize} shrink-0 rounded-full border border-dashed border-neutral-300 bg-neutral-100`}
-      />
-    );
+    // Sin indicador visible; el espacio se reserva para no alterar la retícula.
+    return <span aria-hidden="true" className={`inline-block ${dotSize} shrink-0`} />;
   }
 
   const monthName = month ? MONTH_NAMES[month - 1] : null;
@@ -80,7 +74,9 @@ export function ComplianceCell({
       role="img"
       aria-label={label}
       title={label}
-      className={`inline-block ${dotSize} rounded-full ${COLOR[status]} ring-1 ring-inset ring-black/5`}
+      className={`inline-block ${dotSize} rounded-full ${COLOR[status]}${
+        status === "future" ? "" : " ring-1 ring-inset ring-black/5"
+      }`}
     />
   );
 
@@ -171,5 +167,4 @@ export const COMPLIANCE_LEGEND: Array<{ status: CellStatus; label: string }> = [
   { status: "missing", label: "Faltante" },
   { status: "pending", label: "En plazo" },
   { status: "future", label: "Mes futuro" },
-  { status: "not_required", label: "No aplica" },
 ];

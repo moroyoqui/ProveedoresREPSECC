@@ -6,7 +6,7 @@
 
 **Status**: Draft
 
-**Input**: User description: "Quiero que el greet se muestre toda la información pertinente y que sea responsivo. Quiero que quites la el dato del último acceso. Quiero que además agregues una consulta, una forma de consulta de todos los datos del del del usuario. Cuando le hagas clic al nombre, entonces el nombre en el greet debe de quedar clic y hable con un link ahí, Los botones de contraseña, deshabilitar y asignar proveedor, si quieres mejor, déjalos en puro ícono, y cuando hagas hover que despliegue el tooltip de la acción."
+**Input**: User description: "Quiero que el grid se muestre toda la información pertinente y que sea responsivo. Quiero que quites la el dato del último acceso. Quiero que además agregues una consulta, una forma de consulta de todos los datos del del del usuario. Cuando le hagas clic al nombre, entonces el nombre en el grid debe de quedar clic y hable con un link ahí, Los botones de contraseña, deshabilitar y asignar proveedor, si quieres mejor, déjalos en puro ícono, y cuando hagas hover que despliegue el tooltip de la acción."
 
 ## User Scenarios & Testing *(mandatory)*
 
