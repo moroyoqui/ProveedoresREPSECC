@@ -23,6 +23,7 @@ import repse.document_types.models  # noqa: F401
 import repse.documents.models  # noqa: F401
 import repse.audit.models  # noqa: F401
 import repse.compliance.models  # noqa: F401
+import repse.alerts.models  # noqa: F401
 
 config = context.config
 

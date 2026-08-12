@@ -6,7 +6,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   ChevronLeft, ChevronRight, Download, X, RefreshCcw,
-  FileText, Plus, Loader2, CheckCircle, XCircle, Upload,
+  FileText, Plus, Loader2, CheckCircle, XCircle, Upload, Trash2,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 
@@ -65,6 +65,8 @@ export function PortalDocumentViewerModal({
   const [addItems, setAddItems] = useState<AddFileItem[]>([]);
   const addFileRef = useRef<HTMLInputElement>(null);
   const addUploadingRef = useRef(false);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["documents-list", "portal", documentTypeId, coveragePeriodStart],
@@ -174,6 +176,21 @@ export function PortalDocumentViewerModal({
     }
   }
 
+  async function handleDelete(docId: number, docName: string) {
+    if (deletingId != null) return;
+    if (!window.confirm(`¿Eliminar "${docName}"? Esta acción no se puede deshacer.`)) return;
+    setDeleteError(null);
+    setDeletingId(docId);
+    try {
+      await portalApi.deleteDocument(docId);
+      await refetch();  // el efecto de clamp ajusta selectedIdx si queda fuera de rango
+    } catch (e) {
+      setDeleteError(e instanceof ApiError ? e.message : "No se pudo eliminar el archivo.");
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
   const previewBlobUrl = selectedDoc ? blobUrlCache[selectedDoc.id] : undefined;
   const canPreview = selectedDoc && PREVIEW_MIME_TYPES.has(selectedDoc.file?.mime_type ?? "");
   const isImage = selectedDoc && selectedDoc.file?.mime_type?.startsWith("image/");
@@ -244,11 +261,11 @@ export function PortalDocumentViewerModal({
               {!isLoading && docs.length > 0 && (
                 <ul className="divide-y divide-neutral-100">
                   {docs.map((doc, idx) => (
-                    <li key={doc.id}>
+                    <li key={doc.id} className="group relative flex items-stretch">
                       <button
                         type="button"
                         onClick={() => setSelectedIdx(idx)}
-                        className={`w-full px-4 py-3 text-left text-sm transition-colors hover:bg-neutral-50 ${
+                        className={`min-w-0 flex-1 px-4 py-3 text-left text-sm transition-colors hover:bg-neutral-50 ${
                           idx === selectedIdx ? "bg-brand-50 text-brand-700" : "text-neutral-800"
                         }`}
                       >
@@ -263,6 +280,22 @@ export function PortalDocumentViewerModal({
                           </span>
                         )}
                       </button>
+                      {canAddDocuments && uploadFn && !doc.verified && (
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(doc.id, doc.file?.name ?? `Archivo ${doc.id}`)}
+                          disabled={deletingId != null}
+                          aria-label="Eliminar archivo"
+                          title="Eliminar archivo"
+                          className="shrink-0 px-2 text-neutral-300 transition-colors hover:text-status-expired disabled:opacity-40"
+                        >
+                          {deletingId === doc.id ? (
+                            <Loader2 size={15} className="animate-spin" />
+                          ) : (
+                            <Trash2 size={15} />
+                          )}
+                        </button>
+                      )}
                     </li>
                   ))}
                 </ul>
@@ -272,6 +305,11 @@ export function PortalDocumentViewerModal({
                 <>
                   <hr className="border-neutral-100" />
                   <div className="p-3">
+                    {deleteError && (
+                      <p className="mb-2 rounded-md bg-red-50 px-2 py-1.5 text-xs text-status-expired">
+                        {deleteError}
+                      </p>
+                    )}
                     <input
                       type="file"
                       multiple

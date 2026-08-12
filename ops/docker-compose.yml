@@ -49,6 +49,17 @@ services:
       TESSERACT_LANG: ${TESSERACT_LANG}
       SENTRY_DSN: ${SENTRY_DSN}
       PROMETHEUS_ENABLED: ${PROMETHEUS_ENABLED}
+      ALERTS_SCHEDULER_ENABLED: ${ALERTS_SCHEDULER_ENABLED}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_USERNAME: ${SMTP_USERNAME}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SMTP_USE_STARTTLS: ${SMTP_USE_STARTTLS}
+      SMTP_USE_SSL: ${SMTP_USE_SSL}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL}
+      SMTP_FROM_NAME: ${SMTP_FROM_NAME}
+      SMTP_REPLY_TO: ${SMTP_REPLY_TO}
+      SMTP_TIMEOUT_SECONDS: ${SMTP_TIMEOUT_SECONDS}
     command: ["uvicorn", "repse.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--reload"]
     volumes:
       - uploads_data:${UPLOAD_ROOT}
@@ -60,6 +71,18 @@ services:
       - "8000"
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  mailpit:
+    image: axllent/mailpit:latest
+    restart: unless-stopped
+    ports:
+      - "8025:8025"   # web UI
+      - "1025:1025"   # SMTP
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:8025/livez"]
       interval: 15s
       timeout: 5s
       retries: 5

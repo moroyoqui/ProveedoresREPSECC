@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from repse.audit import actions as audit_actions
 from repse.audit.service import AuditEvent, write_event
+from repse.common.cache import bump_tenant_version
 from repse.errors import Conflict, NotFound, UnprocessableEntity, ValidationFailure
 from repse.giros.models import Giro
 from repse.sectors.models import Sector
@@ -117,6 +118,7 @@ def create_supplier(
         ),
     )
     db.commit()
+    bump_tenant_version(organization_id)  # FR-021a: invalida cache del tablero
     db.refresh(supplier)
     return supplier
 
@@ -243,6 +245,7 @@ def update_supplier(
             ),
         )
     db.commit()
+    bump_tenant_version(organization_id)  # FR-021a: invalida cache del tablero
     db.refresh(supplier)
     return supplier
 
@@ -267,6 +270,7 @@ def deactivate_supplier(
         ),
     )
     db.commit()
+    bump_tenant_version(organization_id)  # FR-021a: invalida cache del tablero
 
 
 def reactivate_supplier(
@@ -289,6 +293,7 @@ def reactivate_supplier(
         ),
     )
     db.commit()
+    bump_tenant_version(organization_id)  # FR-021a: invalida cache del tablero
     db.refresh(supplier)
     return supplier
 

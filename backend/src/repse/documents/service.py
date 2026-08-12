@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from repse.audit import actions as audit_actions
 from repse.audit.service import AuditEvent, write_event, write_system_event
+from repse.common.cache import bump_tenant_version
 from repse.config import Settings
 from repse.documents.expiration import Periodicity as ExpPeriodicity, compute_due_date
 from repse.documents.models import Document, DocumentStatus, OcrStatus
@@ -235,6 +236,7 @@ def upload_document(
             },
         )
     db.commit()
+    bump_tenant_version(organization_id)  # FR-021a: invalida cache del tablero
     db.refresh(doc)
     return doc
 
@@ -292,6 +294,7 @@ def verify_document(
         ),
     )
     db.commit()
+    bump_tenant_version(organization_id)  # FR-021a: invalida cache del tablero
     db.refresh(doc)
     return doc
 
@@ -323,6 +326,7 @@ def unverify_document(
         ),
     )
     db.commit()
+    bump_tenant_version(organization_id)  # FR-021a: invalida cache del tablero
     db.refresh(doc)
     return doc
 
@@ -333,14 +337,16 @@ def delete_document(
     document_id: int,
     organization_id: int,
     actor_user_id: int,
-    grace_hours: int,
+    grace_hours: int | None,
     settings: Settings,
     reason: str | None = None,
 ) -> None:
     """Borra un documento dentro de la ventana de gracia (T098 spec 001).
 
     Reglas:
-      * Sólo si ``now - created_at`` ≤ ``grace_hours``.
+      * Sólo si ``now - created_at`` ≤ ``grace_hours``. Con ``grace_hours=None``
+        no se aplica ventana de tiempo (el portal del proveedor controla el
+        permiso por estado de la celda, no por antigüedad).
       * Borra el archivo físico y deja la fila soft-deleted (``deleted_at``).
       * Si la fila era ``is_latest`` y existe una versión previa para la misma
         ``(supplier, type, period)``, la marca como ``is_latest=True`` para
@@ -352,19 +358,20 @@ def delete_document(
         raise NotFound("Document not found")
 
     now = datetime.now(timezone.utc)
-    # Cargado created_at es naive (DateTime sin TZ). Asumimos UTC en MySQL.
-    created_at_utc = doc.created_at
-    if created_at_utc.tzinfo is None:
-        created_at_utc = created_at_utc.replace(tzinfo=timezone.utc)
-    elapsed_seconds = (now - created_at_utc).total_seconds()
-    if elapsed_seconds > grace_hours * 3600:
-        raise Conflict(
-            "Delete window expired",
-            details={
-                "code": "delete_window_expired",
-                "grace_hours": grace_hours,
-            },
-        )
+    if grace_hours is not None:
+        # Cargado created_at es naive (DateTime sin TZ). Asumimos UTC en MySQL.
+        created_at_utc = doc.created_at
+        if created_at_utc.tzinfo is None:
+            created_at_utc = created_at_utc.replace(tzinfo=timezone.utc)
+        elapsed_seconds = (now - created_at_utc).total_seconds()
+        if elapsed_seconds > grace_hours * 3600:
+            raise Conflict(
+                "Delete window expired",
+                details={
+                    "code": "delete_window_expired",
+                    "grace_hours": grace_hours,
+                },
+            )
 
     # Restaurar la versión previa como `latest` si aplica.
     previous_latest_id: int | None = None
@@ -416,3 +423,4 @@ def delete_document(
         ),
     )
     db.commit()
+    bump_tenant_version(organization_id)  # FR-021a: invalida cache del tablero

@@ -76,6 +76,10 @@ export const portalApi = {
       `/portal/documents/${documentId}/download-token`
     ),
 
+  // Borra un archivo propio mientras la celda siga pendiente (no enviada/validada).
+  deleteDocument: (documentId: number): Promise<void> =>
+    apiFetch<void>(`/portal/documents/${documentId}`, { method: "DELETE" }),
+
   upload: (
     file: File,
     documentTypeId: number,

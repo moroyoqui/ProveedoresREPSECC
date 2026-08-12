@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui";
 import type { CellStatus } from "@/lib/api/index";
@@ -11,6 +12,7 @@ import { PortalDocumentViewerModal } from "@/components/portal/PortalDocumentVie
 import {
   CURRENT_YEAR,
   YEAR_OPTIONS,
+  cargaUrl,
   computeCounts,
 } from "./shared";
 
@@ -30,6 +32,7 @@ type OneTimeViewerState = {
 export function PortalConsultaPage() {
   const [year, setYear] = useState(CURRENT_YEAR);
   const [oneTimeViewer, setOneTimeViewer] = useState<OneTimeViewerState | null>(null);
+  const navigate = useNavigate();
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["portal-compliance", year],
@@ -39,6 +42,13 @@ export function PortalConsultaPage() {
   function handleOneTimeViewerClick({ document_type_id }: ViewerClickParams) {
     const item = data?.one_time_requirements.find(r => r.document_type.id === document_type_id);
     if (!item) return;
+    // Sin documento cargado: la consulta es solo lectura, así que se envía a la
+    // pantalla de Carga con el tipo preseleccionado (FR-004) en lugar de abrir
+    // el visor sin opción de subir.
+    if (item.document_id == null) {
+      navigate(cargaUrl({ document_type_id, coverage_period_start: null }));
+      return;
+    }
     setOneTimeViewer({
       document_type_id,
       documentTypeName: item.document_type.name,

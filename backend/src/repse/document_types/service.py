@@ -21,6 +21,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from repse.audit.service import AuditEvent, write_event
+from repse.common.cache import bump_tenant_version
 from repse.document_types.models import (
     DocumentType,
     DocumentTypeOrigin,
@@ -136,6 +137,7 @@ def set_canonical_active(
         metadata={"prev_active": prev_active, "active": active, "reason": reason or ""},
     )
     db.commit()
+    bump_tenant_version(organization_id)  # FR-021a: invalida cache del tablero
     return {"id": dt.id, "slug": dt.slug, "name": dt.name, "active": active}
 
 
@@ -185,6 +187,7 @@ def create_custom(
         metadata={"name": dt.name, "periodicity": periodicity.value},
     )
     db.commit()
+    bump_tenant_version(organization_id)  # FR-021a: invalida cache del tablero
     db.refresh(dt)
     return dt
 
@@ -229,6 +232,7 @@ def update_custom(
             metadata={"before": before, "after": after},
         )
     db.commit()
+    bump_tenant_version(organization_id)  # FR-021a: invalida cache del tablero
     db.refresh(dt)
     return dt
 
@@ -255,6 +259,7 @@ def archive_custom(
         metadata={},
     )
     db.commit()
+    bump_tenant_version(organization_id)  # FR-021a: invalida cache del tablero
     db.refresh(dt)
     return dt
 
@@ -281,6 +286,7 @@ def restore_custom(
         metadata={},
     )
     db.commit()
+    bump_tenant_version(organization_id)  # FR-021a: invalida cache del tablero
     db.refresh(dt)
     return dt
 

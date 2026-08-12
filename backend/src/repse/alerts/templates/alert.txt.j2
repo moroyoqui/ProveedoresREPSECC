@@ -1,0 +1,16 @@
+{{ subject }}
+
+{% if alert_type == "expired" -%}
+Los siguientes documentos del proveedor {{ supplier_name }} están VENCIDOS:
+{%- else -%}
+Los siguientes documentos del proveedor {{ supplier_name }} están POR VENCER:
+{%- endif %}
+
+{% for d in documents %}
+- {{ d.type_name }} | Periodo: {{ d.period or "—" }} | Vence: {{ d.due_date or "—" }}{% if d.days_until_due is not none %} ({{ d.days_until_due }} días){% endif %}
+{% endfor %}
+{% if documents and documents[0].link %}
+Ver detalle (requiere sesión): {{ documents[0].link }}
+{% endif %}
+
+— Cumplimiento REPSE (notificación operativa automática)

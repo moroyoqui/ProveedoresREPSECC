@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, timezone
 
-from fastapi import APIRouter, Depends, File, Form, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Response, UploadFile
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -27,8 +27,8 @@ from repse.config import Settings, get_settings
 from repse.db.session import get_db
 from repse.db.tenant_filter import set_current_tenant
 from repse.documents.models import Document, DocumentStatus
-from repse.documents.service import UploadInput, upload_document
-from repse.errors import Conflict, UnprocessableEntity
+from repse.documents.service import UploadInput, delete_document, upload_document
+from repse.errors import Conflict, NotFound, UnprocessableEntity
 from repse.portal.models import PortalSubmission, PreSubmissionStatus, SubmissionStatus
 from repse.portal.schemas import SubmissionOut, SubmitRequest, UploadOut
 from repse.users.models import Role
@@ -233,6 +233,93 @@ def portal_submit(
         submitted_at=submission.submitted_at,
         status=submission.status,
     )
+
+
+@router.delete("/documents/{document_id}", status_code=204)
+def portal_delete_document(
+    document_id: int,
+    user: CurrentUser = Depends(require_role(Role.SUPPLIER.value)),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """Elimina un archivo del propio proveedor mientras la celda siga pendiente.
+
+    Se permite borrar siempre que la celda NO haya sido enviada a validación ni
+    validada (sin ventana de tiempo: grace_hours=None). El back-office mantiene
+    su propio endpoint con la ventana de gracia de 24h (documents/routes.py).
+    """
+    if user.supplier_id is None:
+        raise Conflict(
+            "User has no linked supplier",
+            details={"code": "supplier_not_linked"},
+        )
+    set_current_tenant(user.organization_id)
+
+    doc = db.get(Document, document_id)
+    if (
+        doc is None
+        or doc.organization_id != user.organization_id
+        or doc.supplier_id != user.supplier_id
+        or doc.deleted_at is not None
+    ):
+        raise NotFound("Document not found")
+
+    _check_delete_allowed(
+        db,
+        organization_id=user.organization_id,
+        supplier_id=user.supplier_id,
+        document_type_id=doc.document_type_id,
+        coverage_period_start=doc.coverage_period_start,
+    )
+
+    delete_document(
+        db,
+        document_id=document_id,
+        organization_id=user.organization_id,
+        actor_user_id=user.user_id,
+        grace_hours=None,
+        settings=settings,
+    )
+    return Response(status_code=204)
+
+
+def _check_delete_allowed(
+    db: Session,
+    *,
+    organization_id: int,
+    supplier_id: int,
+    document_type_id: int,
+    coverage_period_start: date | None,
+) -> None:
+    """Raise Conflict if the cell is already submitted for validation or validated."""
+    pending = db.execute(
+        select(PortalSubmission).where(
+            PortalSubmission.organization_id == organization_id,
+            PortalSubmission.supplier_id == supplier_id,
+            PortalSubmission.document_type_id == document_type_id,
+            PortalSubmission.coverage_period_start == coverage_period_start,
+            PortalSubmission.status == SubmissionStatus.PENDING,
+        )
+    ).scalar_one_or_none()
+    if pending is not None:
+        raise Conflict(
+            "Delete not allowed: cell already submitted for validation",
+            details={"code": "delete_not_allowed"},
+        )
+
+    validated = db.execute(
+        select(ComplianceCellValidation).where(
+            ComplianceCellValidation.organization_id == organization_id,
+            ComplianceCellValidation.supplier_id == supplier_id,
+            ComplianceCellValidation.document_type_id == document_type_id,
+            ComplianceCellValidation.coverage_period_start == coverage_period_start,
+        )
+    ).scalar_one_or_none()
+    if validated is not None:
+        raise Conflict(
+            "Delete not allowed: cell is validated",
+            details={"code": "delete_not_allowed"},
+        )
 
 
 def _check_upload_allowed(
