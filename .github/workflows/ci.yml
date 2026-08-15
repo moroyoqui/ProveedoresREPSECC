@@ -47,7 +47,12 @@ jobs:
         # Settings exige APP_SECRET (>=16 chars); en local sale del .env de la
         # raíz, que no se versiona. Las DB_* las inyecta conftest desde el
         # contenedor de MySQL.
+        # UPLOAD_ROOT apunta por defecto a /var/repse/uploads, que sólo existe
+        # dentro del contenedor de la app; en el runner se usa un temporal.
         env:
           APP_ENV: local
           APP_SECRET: ci-secret-not-used-in-production
-        run: pytest backend/tests
+          UPLOAD_ROOT: ${{ runner.temp }}/repse-uploads
+        run: |
+          mkdir -p "$UPLOAD_ROOT"
+          pytest backend/tests
