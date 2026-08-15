@@ -1,0 +1,41 @@
+# Caddy de producción: TLS automático vía ACME para CADDY_DOMAIN, estáticos del
+# frontend desde /srv y proxy de la API hacia el contenedor app.
+# El redirect HTTP -> HTTPS lo hace Caddy solo cuando el sitio tiene dominio.
+
+{$CADDY_DOMAIN} {
+	encode gzip zstd
+
+	header {
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "geolocation=(), microphone=(), camera=()"
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+	}
+
+	# Bloques `handle`: mutuamente excluyentes y evaluados en el orden escrito,
+	# a diferencia de las directivas sueltas, que Caddy reordena por su cuenta.
+	@api path /api/* /docs /openapi.json /health
+	handle @api {
+		reverse_proxy app:8000
+	}
+
+	# /metrics queda fuera del proxy público: se consulta desde la red interna.
+	handle /metrics {
+		respond 404
+	}
+
+	# SPA: cualquier ruta desconocida cae en index.html para que React Router
+	# resuelva del lado del cliente.
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}

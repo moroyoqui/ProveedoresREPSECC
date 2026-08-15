@@ -1,0 +1,24 @@
+# Imagen web de producción: compila el frontend con Vite y lo sirve como
+# estáticos desde Caddy, que además hace de reverse proxy hacia app:8000.
+# En dev el frontend corre con `vite dev` (ops/Dockerfile.frontend); aquí no
+# hay servidor de desarrollo ni bind mounts.
+
+FROM node:20-alpine AS build
+
+WORKDIR /app
+
+COPY frontend/package.json frontend/package-lock.json /app/
+RUN npm ci --legacy-peer-deps
+
+COPY frontend /app
+# El cliente apunta a /api/v1 relativo al propio origen (frontend/src/lib/api.ts),
+# así que el bundle no depende del dominio y no necesita variables de build.
+RUN npm run build
+
+
+FROM caddy:2-alpine AS runtime
+
+COPY ops/Caddyfile.prod /etc/caddy/Caddyfile
+COPY --from=build /app/dist /srv
+
+EXPOSE 80 443

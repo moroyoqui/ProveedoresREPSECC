@@ -1,0 +1,118 @@
+name: Deploy a producción
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:      # permite relanzar un despliegue a mano
+
+concurrency:
+  group: deploy-prod      # nunca dos despliegues simultáneos
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_BASE: ghcr.io/${{ github.repository }}
+
+jobs:
+  # Gate: si los tests del backend fallan, no se construye ni se despliega.
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  build:
+    name: Build y push a GHCR
+    needs: ci
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      app_image: ${{ steps.names.outputs.app_image }}
+      web_image: ${{ steps.names.outputs.web_image }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Login en GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # El repositorio puede tener mayúsculas; GHCR exige minúsculas.
+      - name: Calcular nombres de imagen
+        id: names
+        run: |
+          base="$(echo "${{ env.IMAGE_BASE }}" | tr '[:upper:]' '[:lower:]')"
+          sha="${GITHUB_SHA::7}"
+          echo "app_image=$base/app:$sha" >> "$GITHUB_OUTPUT"
+          echo "web_image=$base/web:$sha" >> "$GITHUB_OUTPUT"
+          echo "base=$base" >> "$GITHUB_OUTPUT"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
+      - name: Build + push app
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ops/Dockerfile.app
+          push: true
+          tags: |
+            ${{ steps.names.outputs.app_image }}
+            ${{ steps.names.outputs.base }}/app:latest
+          cache-from: type=gha,scope=app
+          cache-to: type=gha,scope=app,mode=max
+
+      - name: Build + push web
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ops/Dockerfile.web
+          push: true
+          tags: |
+            ${{ steps.names.outputs.web_image }}
+            ${{ steps.names.outputs.base }}/web:latest
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,scope=web,mode=max
+
+  deploy:
+    name: Desplegar en el servidor
+    needs: build
+    runs-on: ubuntu-latest
+    environment: production      # permite exigir aprobación manual si se quiere
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configurar SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          echo "${{ secrets.DEPLOY_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+
+      # El compose y los scripts viven en el repo: se copian en cada despliegue
+      # para que el servidor nunca quede con una versión desfasada.
+      - name: Sincronizar compose y scripts
+        run: |
+          scp -P "${{ secrets.DEPLOY_SSH_PORT || 22 }}" \
+            ops/prod/docker-compose.prod.yml \
+            ops/prod/deploy.sh \
+            ops/prod/backup.sh \
+            "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/opt/repse/"
+
+      - name: Ejecutar despliegue
+        run: |
+          ssh -p "${{ secrets.DEPLOY_SSH_PORT || 22 }}" \
+            "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" \
+            "chmod +x /opt/repse/deploy.sh /opt/repse/backup.sh && \
+             /opt/repse/deploy.sh '${{ needs.build.outputs.app_image }}' '${{ needs.build.outputs.web_image }}'"
+
+      - name: Resumen
+        if: success()
+        run: |
+          {
+            echo "### Despliegue OK"
+            echo ""
+            echo "- app: \`${{ needs.build.outputs.app_image }}\`"
+            echo "- web: \`${{ needs.build.outputs.web_image }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"

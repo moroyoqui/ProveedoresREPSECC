@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: ["main"]
+  workflow_call:        # lo reutiliza deploy.yml como gate previo al build
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (ruff + pytest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/pyproject.toml
+
+      # Tesseract y poppler son dependencias nativas de pytesseract/pdf2image;
+      # sin ellas los tests de OCR fallan al importar.
+      - name: Dependencias del sistema (OCR)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            tesseract-ocr tesseract-ocr-spa tesseract-ocr-eng poppler-utils
+
+      - name: Instalar backend
+        run: pip install -e "./backend[dev]"
+
+      # Informativo: el gate de despliegue son los tests, no el estilo. Quitar
+      # continue-on-error cuando el código esté limpio de ruff.
+      - name: Ruff
+        continue-on-error: true
+        run: ruff check backend/src backend/tests
+
+      # Los tests levantan MySQL 8 con testcontainers; el runner ya trae Docker.
+      # Se ejecutan desde la raíz porque conftest resuelve backend/alembic.ini
+      # con rutas relativas al repo.
+      - name: Pytest
+        run: pytest backend/tests

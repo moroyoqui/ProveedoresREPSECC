@@ -1,0 +1,109 @@
+name: repse-prod
+
+# Stack de producción. A diferencia de ops/docker-compose.yml (desarrollo):
+#   * usa imágenes publicadas en GHCR, no build local;
+#   * sin bind mounts del código ni --reload;
+#   * sin mailpit (SMTP real) y sin puerto de MySQL publicado;
+#   * Caddy escucha en 80/443 del host con TLS automático.
+
+services:
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      - --default-authentication-plugin=caching_sha2_password
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  app:
+    image: ${APP_IMAGE}
+    restart: unless-stopped
+    environment:
+      APP_ENV: ${APP_ENV}
+      APP_SECRET: ${APP_SECRET}
+      APP_BASE_URL: ${APP_BASE_URL}
+      UPLOAD_ROOT: ${UPLOAD_ROOT}
+      LOG_LEVEL: ${LOG_LEVEL}
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT}
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASS: ${DB_PASS}
+      OIDC_GOOGLE_CLIENT_ID: ${OIDC_GOOGLE_CLIENT_ID}
+      OIDC_GOOGLE_CLIENT_SECRET: ${OIDC_GOOGLE_CLIENT_SECRET}
+      OIDC_MICROSOFT_CLIENT_ID: ${OIDC_MICROSOFT_CLIENT_ID}
+      OIDC_MICROSOFT_CLIENT_SECRET: ${OIDC_MICROSOFT_CLIENT_SECRET}
+      OIDC_MICROSOFT_TENANT: ${OIDC_MICROSOFT_TENANT}
+      TESSERACT_LANG: ${TESSERACT_LANG}
+      SENTRY_DSN: ${SENTRY_DSN}
+      PROMETHEUS_ENABLED: ${PROMETHEUS_ENABLED}
+      ALERTS_SCHEDULER_ENABLED: ${ALERTS_SCHEDULER_ENABLED}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_USERNAME: ${SMTP_USERNAME}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SMTP_USE_STARTTLS: ${SMTP_USE_STARTTLS}
+      SMTP_USE_SSL: ${SMTP_USE_SSL}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL}
+      SMTP_FROM_NAME: ${SMTP_FROM_NAME}
+      SMTP_REPLY_TO: ${SMTP_REPLY_TO}
+      SMTP_TIMEOUT_SECONDS: ${SMTP_TIMEOUT_SECONDS}
+    # Un solo worker a propósito: el scheduler de alertas
+    # (ALERTS_SCHEDULER_ENABLED) vive dentro del proceso de la app y con varios
+    # workers se dispararía N veces. Si hace falta escalar, primero hay que
+    # sacar el scheduler a un servicio aparte.
+    command:
+      - uvicorn
+      - repse.main:app
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "8000"
+      - --proxy-headers
+      - --forwarded-allow-ips
+      - "*"
+    volumes:
+      - uploads_data:${UPLOAD_ROOT}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    expose:
+      - "8000"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  web:
+    image: ${WEB_IMAGE}
+    restart: unless-stopped
+    environment:
+      CADDY_DOMAIN: ${CADDY_DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      app:
+        condition: service_healthy
+
+volumes:
+  mysql_data:
+  uploads_data:
+  caddy_data:
+  caddy_config:
