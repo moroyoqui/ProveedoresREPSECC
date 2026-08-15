@@ -44,4 +44,10 @@ jobs:
       # Se ejecutan desde la raíz porque conftest resuelve backend/alembic.ini
       # con rutas relativas al repo.
       - name: Pytest
+        # Settings exige APP_SECRET (>=16 chars); en local sale del .env de la
+        # raíz, que no se versiona. Las DB_* las inyecta conftest desde el
+        # contenedor de MySQL.
+        env:
+          APP_ENV: local
+          APP_SECRET: ci-secret-not-used-in-production
         run: pytest backend/tests

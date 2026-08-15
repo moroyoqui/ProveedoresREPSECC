@@ -77,16 +77,18 @@ def _row_counts(db_session):
 
 
 def test_read_router_only_registers_get_methods():
-    """Estructural: routes_read solo expone GET; routes_write solo POST."""
+    """Estructural: routes_read solo expone GET; routes_write nunca expone GET."""
     from repse.portal import routes_read, routes_write
 
     for route in routes_read.router.routes:
         assert route.methods == {"GET"}, f"{route.path} no es GET-only"
     assert len(routes_read.router.routes) == 5
 
+    # routes_write agrupa las operaciones de escritura: upload y submit (POST)
+    # más el borrado de documentos del portal (DELETE).
     for route in routes_write.router.routes:
-        assert route.methods == {"POST"}, f"{route.path} no es POST"
-    assert len(routes_write.router.routes) == 2
+        assert route.methods in ({"POST"}, {"DELETE"}), f"{route.path} no es de escritura"
+    assert len(routes_write.router.routes) == 3
 
 
 @pytest.mark.integration
