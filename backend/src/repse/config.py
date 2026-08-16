@@ -78,6 +78,10 @@ class Settings(BaseSettings):
     smtp_reply_to: str = ""
     smtp_timeout_seconds: int = Field(default=10, ge=1)
 
+    # Brevo: si hay API key, el envío va por su API transaccional en vez del
+    # relay SMTP. El remitente sigue saliendo de smtp_from_email/_name.
+    brevo_api_key: SecretStr = SecretStr("")
+
     @field_validator("app_secret")
     @classmethod
     def _validate_secret_length(cls, v: SecretStr, info: ValidationInfo) -> SecretStr:

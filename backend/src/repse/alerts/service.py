@@ -31,7 +31,7 @@ from repse.alerts.models import (
     RunStatus,
 )
 from repse.alerts.render import render_alert_email
-from repse.alerts.smtp_client import SmtpError, send_email
+from repse.alerts.mailer import SmtpError, send_email
 from repse.config import get_settings
 from repse.db.session import session_scope
 from repse.db.tenant_filter import set_current_tenant, with_admin_scope
