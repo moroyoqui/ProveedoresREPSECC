@@ -27,7 +27,7 @@ open https://localhost
 | Capa | Tecnología |
 |------|------------|
 | Backend | Python 3.12, FastAPI, SQLAlchemy 2.x, Alembic, Pydantic v2 |
-| Auth | OAuth/OIDC (Google + Microsoft) vía Authlib |
+| Auth | Email + contraseña (hash Argon2) con cookie de sesión firmada |
 | DB | MySQL 8.0 |
 | Storage | Disco local con tokens JWS firmados |
 | OCR | Tesseract local (pytesseract + pdf2image) |

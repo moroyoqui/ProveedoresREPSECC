@@ -9,7 +9,6 @@ from contextlib import asynccontextmanager, suppress
 from fastapi import Depends, FastAPI
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
-from starlette.middleware.sessions import SessionMiddleware
 
 from repse.alerts.routes import router as alerts_router
 from repse.alerts.scheduler import schedule_daily_alerts
@@ -80,15 +79,6 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Authlib OIDC stores transient state (oauth_state) in this signed Starlette
-# session. Independent from our app cookie.
-app.add_middleware(
-    SessionMiddleware,
-    secret_key=_settings.app_secret.get_secret_value(),
-    session_cookie="oidc_state",
-    https_only=not _settings.is_local,
-    same_site="lax",
-)
 app.add_middleware(RequestContextMiddleware)
 app.state.limiter = limiter
 app.add_middleware(SlowAPIMiddleware)

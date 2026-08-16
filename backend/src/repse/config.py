@@ -34,13 +34,6 @@ class Settings(BaseSettings):
     db_user: str = "repse"
     db_pass: SecretStr
 
-    # OIDC
-    oidc_google_client_id: str = ""
-    oidc_google_client_secret: SecretStr = SecretStr("")
-    oidc_microsoft_client_id: str = ""
-    oidc_microsoft_client_secret: SecretStr = SecretStr("")
-    oidc_microsoft_tenant: str = "common"
-
     # OCR
     tesseract_lang: str = "spa+eng"
 

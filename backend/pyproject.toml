@@ -13,7 +13,6 @@ dependencies = [
     "pydantic[email]>=2.6",
     "pydantic-settings>=2.2",
     "email-validator>=2.1",
-    "authlib>=1.3",
     "itsdangerous>=2.1",
     "python-multipart>=0.0.9",
     "httpx>=0.27",
@@ -73,7 +72,7 @@ plugins = ["pydantic.mypy"]
 files = ["src/repse"]
 
 [[tool.mypy.overrides]]
-module = ["pytesseract.*", "pdf2image.*", "authlib.*"]
+module = ["pytesseract.*", "pdf2image.*", "sib_api_v3_sdk.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

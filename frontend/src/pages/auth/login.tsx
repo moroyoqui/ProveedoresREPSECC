@@ -74,25 +74,6 @@ export function LoginPage() {
             </Button>
           </form>
 
-          <div className="flex items-center gap-3 text-xs uppercase tracking-widest text-neutral-400">
-            <span className="h-px flex-1 bg-neutral-200" />
-            o
-            <span className="h-px flex-1 bg-neutral-200" />
-          </div>
-
-          <a
-            href="/api/v1/auth/login/google"
-            className="block w-full rounded-md border border-brand-200 px-4 py-2.5 text-center text-sm font-medium text-brand-700 hover:bg-brand-50"
-          >
-            Continuar con Google
-          </a>
-          <a
-            href="/api/v1/auth/login/microsoft"
-            className="block w-full rounded-md border border-brand-200 px-4 py-2.5 text-center text-sm font-medium text-brand-700 hover:bg-brand-50"
-          >
-            Continuar con Microsoft
-          </a>
-
           <p className="text-center text-xs text-neutral-500">
             ¿Eres proveedor?{" "}
             <a href="/portal/login" className="font-medium text-brand-700 hover:underline">
