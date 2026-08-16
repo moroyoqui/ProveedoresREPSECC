@@ -25,9 +25,18 @@ compose() {
     docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" "$@"
 }
 
-# shellcheck disable=SC1090
-set -a; source "$ENV_FILE"; set +a
+# Se leen sólo las claves necesarias en vez de hacer `source` del .env: los
+# valores con espacios (p. ej. SMTP_FROM_NAME=REPSE Compliance) son válidos para
+# docker compose, pero bash los interpretaría como comandos.
+env_get() {
+    grep -E "^$1=" "$ENV_FILE" | tail -1 | cut -d= -f2-
+}
 
+MYSQL_ROOT_PASSWORD="$(env_get MYSQL_ROOT_PASSWORD)"
+DB_NAME="$(env_get DB_NAME)"
+APP_IMAGE="$(env_get APP_IMAGE)"
+WEB_IMAGE="$(env_get WEB_IMAGE)"
+BACKUP_DIR="$(env_get BACKUP_DIR)"
 BACKUP_DIR="${BACKUP_DIR:-$DEPLOY_DIR/backups}"
 
 log() { printf '\n[deploy] %s\n' "$*"; }

@@ -8,11 +8,18 @@ DEPLOY_DIR="${DEPLOY_DIR:-/opt/repse}"
 ENV_FILE="$DEPLOY_DIR/.env"
 COMPOSE_FILE="$DEPLOY_DIR/docker-compose.prod.yml"
 
-# shellcheck disable=SC1090
-set -a; source "$ENV_FILE"; set +a
+# Lectura directa en vez de `source`: el .env admite valores con espacios que
+# bash intentaría ejecutar (ver deploy.sh).
+env_get() {
+    grep -E "^$1=" "$ENV_FILE" | tail -1 | cut -d= -f2-
+}
 
+MYSQL_ROOT_PASSWORD="$(env_get MYSQL_ROOT_PASSWORD)"
+DB_NAME="$(env_get DB_NAME)"
+BACKUP_DIR="$(env_get BACKUP_DIR)"
 BACKUP_DIR="${BACKUP_DIR:-$DEPLOY_DIR/backups}"
-RETENTION="${BACKUP_RETENTION_DAYS:-14}"
+RETENTION="$(env_get BACKUP_RETENTION_DAYS)"
+RETENTION="${RETENTION:-14}"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 
 mkdir -p "$BACKUP_DIR"
