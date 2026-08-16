@@ -28,6 +28,20 @@ from repse.organizations.models import Organization, OrgStatus
 from repse.supplier_types.provisioning import provision_organization
 from repse.users.models import Role, User, UserStatus
 
+# El mapeo de SQLAlchemy sólo resuelve si TODO el metadata está registrado: sin
+# esto, User.supplier_id no encuentra la tabla 'suppliers' y el script aborta.
+# Mismo patrón que alembic/env.py.
+import repse.alerts.models  # noqa: F401,E402
+import repse.audit.models  # noqa: F401,E402
+import repse.compliance.models  # noqa: F401,E402
+import repse.document_types.models  # noqa: F401,E402
+import repse.documents.models  # noqa: F401,E402
+import repse.giros.models  # noqa: F401,E402
+import repse.portal.models  # noqa: F401,E402
+import repse.sectors.models  # noqa: F401,E402
+import repse.supplier_types.models  # noqa: F401,E402
+import repse.suppliers.models  # noqa: F401,E402
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Create an admin user (local auth).")
