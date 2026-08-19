@@ -2,6 +2,11 @@
 
 Never blocks the upload (research.md §4 spec 001). If anything fails we return
 an empty extraction and let the user fill the form manually.
+
+Corre dentro de la petición de carga, así que está acotado a la primera página
+y con timeout: en los documentos REPSE (constancia de situación fiscal, opinión
+de cumplimiento, constancia REPSE) el RFC y las fechas están en la portada, y
+recorrer el resto sólo costaba minutos de espera y cientos de MB de RAM.
 """
 
 from __future__ import annotations
@@ -20,6 +25,11 @@ from repse.config import Settings
 from repse.logging import get_logger
 
 log = get_logger(__name__)
+
+# Páginas del PDF que se rasterizan y pasan por Tesseract, y corte duro por
+# imagen para que una página muy densa tampoco pueda colgar la petición.
+OCR_MAX_PAGES = 1
+OCR_TIMEOUT_SECONDS = 30
 
 # RFC: 3-4 letters, 6 digits (YYMMDD), 3 alphanumerics
 RFC_RE = re.compile(r"\b([A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3})\b")
@@ -58,11 +68,11 @@ def _parse_spanish_dates(text: str) -> list[date]:
 
 
 def _ocr_image(img: Image.Image, lang: str) -> str:
-    return pytesseract.image_to_string(img, lang=lang) or ""
+    return pytesseract.image_to_string(img, lang=lang, timeout=OCR_TIMEOUT_SECONDS) or ""
 
 
 def _ocr_pdf(content: bytes, lang: str) -> str:
-    pages = convert_from_bytes(content, dpi=200)
+    pages = convert_from_bytes(content, dpi=200, first_page=1, last_page=OCR_MAX_PAGES)
     return "\n".join(_ocr_image(p, lang) for p in pages)
 
 
