@@ -16,7 +16,6 @@ from typing import Any
 from sqlalchemy import extract, func, or_, select
 from sqlalchemy.orm import Session
 
-from repse.compliance.models import ComplianceCellValidation
 from repse.compliance.schemas import (
     CellOut,
     CellStatus,
@@ -202,20 +201,10 @@ def get_annual_compliance(
         for r in pending_submission_rows
     }
 
-    # Load type-level validations for the supplier (bulk, one query).
-    # Keys: (document_type_id, coverage_period_start) where period is a date or None.
-    validation_rows = db.execute(
-        select(
-            ComplianceCellValidation.document_type_id,
-            ComplianceCellValidation.coverage_period_start,
-        ).where(
-            ComplianceCellValidation.organization_id == organization_id,
-            ComplianceCellValidation.supplier_id == supplier_id,
-        )
-    ).all()
-    validated_cells: set[tuple[int, date | None]] = {
-        (int(r.document_type_id), r.coverage_period_start) for r in validation_rows
-    }
+    # Spec 017: el estado "validado" ya no se consulta en una tabla aparte — se
+    # deriva del documento vigente de cada celda, que este método ya tiene
+    # cargado. Además de eliminar una consulta, hace imposible que la rejilla y
+    # la pantalla de documentos digan cosas distintas de la misma evidencia.
 
     # Also pick up one-time documents (periodicity 'none' can have NULL coverage
     # period). We need to fetch them in a separate query because the WHERE above
@@ -247,13 +236,24 @@ def get_annual_compliance(
             doc = docs_by_type_no_period.get(dt.id)
             raw_status = cell_status(doc, month=1, year=year, today=today, portal_mode=portal_mode)
             is_pending = (dt.id, None) in pending_submissions
-            final_status = CellStatus.SUBMITTED if is_pending else raw_status
+            # Spec 017: esta rama nunca consultó las validaciones de celda, así
+            # que los tipos sin periodicidad jamás llegaban a mostrarse como
+            # validados. Al derivar del documento queda alineada con la rama
+            # mensual sin necesidad de una regla propia.
+            is_type_validated = doc is not None and doc.verified
+            if is_type_validated:
+                final_status = CellStatus.VALIDATED
+            elif is_pending:
+                final_status = CellStatus.SUBMITTED
+            else:
+                final_status = raw_status
             one_time.append(
                 OneTimeRequirementOut(
                     document_type=brief,
                     status=final_status,
                     document_id=doc.id if doc else None,
                     due_date_effective=doc.due_date_effective if doc else None,
+                    type_validated=is_type_validated,
                 )
             )
             continue
@@ -274,7 +274,7 @@ def get_annual_compliance(
                 continue
             doc = docs_by_type_and_month.get((dt.id, month))
             period_start = _coverage_start(month, year)
-            is_type_validated = (dt.id, period_start) in validated_cells
+            is_type_validated = doc is not None and doc.verified
             is_pending = (dt.id, period_start) in pending_submissions
             raw_status = cell_status(
                 doc, month=month, year=year, today=today,

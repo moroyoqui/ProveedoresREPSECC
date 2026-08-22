@@ -61,20 +61,20 @@ export function DocumentFiltersBar({ filters, onChange }: Props) {
         aria-label="Buscar"
       />
 
-      {/* Verificado */}
+      {/* Validado — spec 017: el parámetro sigue siendo `verified`, el texto no. */}
       <label className="sr-only" htmlFor="filter-verified">
-        Verificado
+        Validado
       </label>
       <select
         id="filter-verified"
-        aria-label="Verificado"
+        aria-label="Validado"
         className="h-9 rounded-md border border-neutral-300 px-2 text-sm focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400"
         value={filters.verified == null ? "" : String(filters.verified)}
         onChange={(e) => handleSelect("verified", e.target.value)}
       >
-        <option value="">Verificado: todos</option>
-        <option value="true">Verificado</option>
-        <option value="false">Sin verificar</option>
+        <option value="">Validado: todos</option>
+        <option value="true">Validado</option>
+        <option value="false">Sin validar</option>
       </select>
 
       {/* Estado de vigencia */}

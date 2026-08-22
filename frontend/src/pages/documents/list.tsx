@@ -58,7 +58,7 @@ export function DocumentsListPage() {
       setUnverifyError(null);
     },
     onError: (e: unknown) => {
-      setUnverifyError(e instanceof ApiError ? e.message : "Error al quitar verificación.");
+      setUnverifyError(e instanceof ApiError ? e.message : "Error al quitar la validación.");
     },
   });
 
@@ -82,12 +82,21 @@ export function DocumentsListPage() {
     qc.invalidateQueries({ queryKey: ["documents-list"] });
   }
 
+  function handleDeleteSuccess() {
+    // El borrado cambia el estado de la celda del proveedor, no sólo el
+    // listado: hay que invalidar también el cumplimiento (spec 016 FR-008).
+    qc.invalidateQueries({ queryKey: ["documents-list"] });
+    qc.invalidateQueries({ queryKey: ["supplier-compliance"] });
+    qc.invalidateQueries({ queryKey: ["dashboard"] });
+    setSelectedDocId(null);
+  }
+
   return (
     <div className="mx-auto max-w-7xl p-8">
       <header className="mb-6">
         <h1 className="text-2xl font-semibold text-brand-700">Documentos</h1>
         <p className="mt-1 text-sm text-neutral-600">
-          Consulta y verifica los archivos cargados por cada proveedor. Haz clic en una fila para ver el detalle.
+          Consulta y valida los archivos cargados por cada proveedor. Haz clic en una fila para ver el detalle.
         </p>
       </header>
 
@@ -125,10 +134,10 @@ export function DocumentsListPage() {
                 <TH>Periodo</TH>
                 <TH>Vencimiento</TH>
                 <TH>Estado</TH>
-                <TH>Verificación</TH>
+                <TH>Validación</TH>
                 <TH>Agregado</TH>
                 <TH className="text-center">Ver</TH>
-                <TH className="text-center">Verificar</TH>
+                <TH className="text-center">Validar</TH>
               </TR>
             </THead>
             <TBody>
@@ -183,10 +192,11 @@ export function DocumentsListPage() {
                           setVerifyTarget(doc);
                         }}
                       >
-                        Verificar
+                        Validar
                       </Button>
                     )}
-                    {doc.verified && user?.role === "admin" && (
+                    {/* Spec 017 (FR-007): el gestor también puede quitar la validación. */}
+                    {doc.verified && (user?.role === "admin" || user?.role === "manager") && (
                       <Button
                         size="sm"
                         variant="ghost"
@@ -196,7 +206,7 @@ export function DocumentsListPage() {
                           unverify.mutate(doc.id);
                         }}
                       >
-                        Quitar verificación
+                        Quitar validación
                       </Button>
                     )}
                   </TD>
@@ -218,6 +228,7 @@ export function DocumentsListPage() {
           document={selectedDoc}
           onClose={handleDrawerClose}
           onVerify={() => setVerifyTarget(selectedDoc)}
+          onDeleteSuccess={handleDeleteSuccess}
           onUnverifySuccess={handleUnverifySuccess}
         />
       )}

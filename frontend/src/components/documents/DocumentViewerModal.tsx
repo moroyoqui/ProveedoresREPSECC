@@ -8,11 +8,23 @@ import {
   ChevronLeft, ChevronRight, Download, X, RefreshCcw,
   FileText, Plus, Loader2, CheckCircle, XCircle, ShieldCheck, Upload,
 } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { ApiError } from "@/lib/api";
+
+/** Spec 017: el rechazo por falta de evidencia tiene motivo propio (FR-005). */
+function validationErrorMessage(e: unknown): string {
+  if (e instanceof ApiError) {
+    const code = (e.details?.code as string | undefined) ?? "";
+    if (code === "no_document_to_validate") {
+      return "No hay documento vigente en esta celda: no hay nada que validar.";
+    }
+    return e.message;
+  }
+  return "No se pudo validar el tipo de documento. Intenta de nuevo.";
+}
 import { documentsApi } from "@/lib/api/index";
-import { fetchDocumentsList, validateDocumentType } from "@/lib/api/documents";
+import { fetchDocumentsList, unvalidateDocumentType, validateDocumentType } from "@/lib/api/documents";
 import { Button } from "@/components/ui";
 import { UPLOAD_ACCEPT, validateUploadFile } from "@/lib/uploadConstraints";
 
@@ -72,6 +84,7 @@ export function DocumentViewerModal({
   const [addItems, setAddItems] = useState<AddFileItem[]>([]);
   const addFileRef = useRef<HTMLInputElement>(null);
   const addUploadingRef = useRef(false);
+  const qc = useQueryClient();
   const [localTypeValidated, setLocalTypeValidated] = useState(typeValidated);
   const [validating, setValidating] = useState(false);
   const [validateError, setValidateError] = useState<string | null>(null);
@@ -154,17 +167,40 @@ export function DocumentViewerModal({
     }
   }
 
+  /** Spec 017: validar escribe en el documento vigente, no en una tabla aparte. */
   async function handleValidateType() {
     setValidating(true);
     setValidateError(null);
     try {
       await validateDocumentType(supplierId, documentTypeId, coveragePeriodStart);
       setLocalTypeValidated(true);
-    } catch {
-      setValidateError("No se pudo validar el tipo de documento. Intenta de nuevo.");
+      invalidateAfterValidation();
+    } catch (e) {
+      setValidateError(validationErrorMessage(e));
     } finally {
       setValidating(false);
     }
+  }
+
+  async function handleUnvalidateType() {
+    setValidating(true);
+    setValidateError(null);
+    try {
+      await unvalidateDocumentType(supplierId, documentTypeId, coveragePeriodStart);
+      setLocalTypeValidated(false);
+      invalidateAfterValidation();
+    } catch (e) {
+      setValidateError(validationErrorMessage(e));
+    } finally {
+      setValidating(false);
+    }
+  }
+
+  /** La marca vive en el documento: el listado y la rejilla quedan obsoletos. */
+  function invalidateAfterValidation() {
+    qc.invalidateQueries({ queryKey: ["documents-list"] });
+    qc.invalidateQueries({ queryKey: ["supplier-compliance"] });
+    qc.invalidateQueries({ queryKey: ["dashboard"] });
   }
 
   async function handleAddFilesSelected(e: React.ChangeEvent<HTMLInputElement>) {
@@ -242,10 +278,25 @@ export function DocumentViewerModal({
                 </p>
               )}
               {localTypeValidated ? (
-                <span className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
-                  <ShieldCheck size={12} />
-                  Tipo de documento validado
-                </span>
+                <div className="mt-0.5 flex flex-col gap-1">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
+                    <ShieldCheck size={12} />
+                    Tipo de documento validado
+                  </span>
+                  {canValidateType && (
+                    <button
+                      type="button"
+                      onClick={handleUnvalidateType}
+                      disabled={validating}
+                      className="self-start text-xs font-medium text-neutral-500 underline hover:text-neutral-700 disabled:opacity-60"
+                    >
+                      {validating ? "Quitando…" : "Quitar validación"}
+                    </button>
+                  )}
+                  {validateError && (
+                    <p className="text-xs text-status-expired">{validateError}</p>
+                  )}
+                </div>
               ) : canValidateType ? (
                 <div className="mt-0.5 flex flex-col gap-1">
                   <button
@@ -319,7 +370,7 @@ export function DocumentViewerModal({
                         </p>
                         {doc.verified && (
                           <span className="mt-1 inline-block rounded bg-green-100 px-1.5 py-0.5 text-[10px] font-medium text-green-700">
-                            Verificado
+                            Validado
                           </span>
                         )}
                       </button>

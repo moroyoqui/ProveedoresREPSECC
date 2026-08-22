@@ -26,7 +26,7 @@ export function VerifyDialog({
       onClose();
     },
     onError: (e: unknown) => {
-      setError(e instanceof ApiError ? e.message : "Error inesperado al verificar.");
+      setError(e instanceof ApiError ? e.message : "Error inesperado al validar.");
     },
   });
 
@@ -34,7 +34,7 @@ export function VerifyDialog({
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-brand-900/40 p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>Marcar como verificado</CardTitle>
+          <CardTitle>Marcar como validado</CardTitle>
         </CardHeader>
         <CardBody>
           {error && (
@@ -43,7 +43,7 @@ export function VerifyDialog({
             </p>
           )}
           <p className="mb-4 text-sm text-neutral-600">
-            Estás marcando como <span className="font-medium text-brand-700">verificado</span> el
+            Estás marcando como <span className="font-medium text-brand-700">validado</span> el
             documento{" "}
             <span className="font-medium">
               {document.file.name}

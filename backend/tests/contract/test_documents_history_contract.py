@@ -191,3 +191,42 @@ def test_history_returns_404_for_other_tenant(
         f"/api/v1/documents/{document_in_org_a.id}/history"
     )
     assert res.status_code == 404
+
+
+def test_delete_by_uploader_appears_in_history(
+    app, db_session, client_with_session, seeded_supplier, opinion_sat_type, session_user
+) -> None:
+    """Spec 016 (US3): el borrado propio queda auditado con autor y fecha.
+
+    El historial debe seguir siendo consultable después del borrado — si no, la
+    eliminación dejaría un hueco inexplicable en la evidencia.
+    """
+    from .test_documents_delete_contract import (
+        _client_as,
+        _make_user,
+        _upload_doc,
+    )
+
+    manager = _make_user(
+        db_session,
+        organization_id=session_user.organization_id,
+        email="gestor-hist@test.mx",
+        role="manager",
+    )
+    mgr_client = _client_as(
+        app, user_id=manager.id, organization_id=session_user.organization_id, role="manager"
+    )
+    doc_id = _upload_doc(mgr_client, seeded_supplier.id, opinion_sat_type.id, unique=b"hist-del")
+
+    assert mgr_client.delete(f"/api/v1/documents/{doc_id}").status_code == 204
+
+    res = mgr_client.get(f"/api/v1/documents/{doc_id}/history")
+    assert res.status_code == 200, res.text
+    deleted = [i for i in res.json()["items"] if i["action"] == "document.deleted"]
+    assert len(deleted) == 1
+
+    event = deleted[0]
+    assert event["actor"]["type"] == "human"
+    assert event["actor"]["user"]["id"] == manager.id
+    assert event["summary"] == "Eliminó el documento"
+    assert event["occurred_at"] is not None

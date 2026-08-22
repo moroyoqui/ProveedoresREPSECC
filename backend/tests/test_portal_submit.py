@@ -206,26 +206,42 @@ def test_submit_rejects_when_already_submitted(app, db_session, session_user):
 
 @pytest.mark.integration
 def test_submit_rejects_validated_cell(app, db_session, session_user):
-    """Cell validated by accounting → 409 cell_not_submittable."""
-    from repse.compliance.models import ComplianceCellValidation
+    """Celda validada → 409 cell_not_submittable.
+
+    Spec 017: la marca vive ahora en el documento vigente, no en una tabla
+    aparte. La regla del portal es la misma; cambia de dónde se lee.
+    """
     from repse.db.tenant_filter import set_current_tenant, with_admin_scope
+    from repse.documents.models import Document, DocumentStatus, OcrStatus
 
     client, user, supplier = _make_supplier_and_client(app, db_session, session_user)
     doc_type = _get_monthly_doc_type(db_session, session_user)
     assert doc_type is not None
 
-    _add_document(db_session, session_user, supplier, doc_type, status="valid")
-
     with with_admin_scope():
         set_current_tenant(session_user.organization_id)
         db_session.add(
-            ComplianceCellValidation(
+            Document(
                 organization_id=session_user.organization_id,
                 supplier_id=supplier.id,
                 document_type_id=doc_type.id,
                 coverage_period_start=_PAST_PERIOD,
-                validated_by=user.id,
-                validated_at=datetime.now(timezone.utc).replace(tzinfo=None),
+                coverage_period_end=date(2026, 1, 31),
+                due_date_calculated=date(2026, 2, 15),
+                due_date_effective=date(2026, 2, 15),
+                status=DocumentStatus.VALID,
+                version=1,
+                is_latest=True,
+                file_path="validated/submit.pdf",
+                file_name_original="doc.pdf",
+                file_size_bytes=100,
+                file_mime_type="application/pdf",
+                file_sha256="c" * 64,
+                ocr_status=OcrStatus.NOT_RUN,
+                uploaded_by=user.id,
+                verified=True,
+                verified_by=user.id,
+                verified_at=datetime.now(timezone.utc).replace(tzinfo=None),
             )
         )
         db_session.commit()

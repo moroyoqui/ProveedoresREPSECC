@@ -50,7 +50,7 @@ export function AuditBlock({ document }: { document: DocumentOut }) {
             )}
           </>
         ) : (
-          <p className="text-sm text-neutral-500">Sin verificar</p>
+          <p className="text-sm text-neutral-500">Sin validar</p>
         )}
       </Block>
     </div>

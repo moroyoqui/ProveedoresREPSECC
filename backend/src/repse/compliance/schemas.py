@@ -63,6 +63,9 @@ class OneTimeRequirementOut(BaseModel):
     status: CellStatus
     document_id: int | None = None
     due_date_effective: date | None = None
+    # Spec 017: presente también aquí para que los tipos sin periodicidad
+    # expongan el mismo dato que las celdas mensuales.
+    type_validated: bool = False
 
 
 class ComplianceGridOut(BaseModel):

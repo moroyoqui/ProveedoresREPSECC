@@ -72,16 +72,40 @@ export function useDocumentsList(filters: DocumentListFilters) {
   });
 }
 
+/** Spec 017: validar una celda marca como validado su documento vigente. */
 export async function validateDocumentType(
   supplierId: number,
   documentTypeId: number,
   coveragePeriodStart: string | null,
-): Promise<void> {
-  await apiFetch<void>(`/suppliers/${supplierId}/compliance/validate`, {
-    method: "POST",
-    json: {
-      document_type_id: documentTypeId,
-      coverage_period_start: coveragePeriodStart,
-    },
-  });
+  note?: string | null,
+): Promise<{ status: string; validated_at: string | null; document_id: number }> {
+  return apiFetch<{ status: string; validated_at: string | null; document_id: number }>(
+    `/suppliers/${supplierId}/compliance/validate`,
+    {
+      method: "POST",
+      json: {
+        document_type_id: documentTypeId,
+        coverage_period_start: coveragePeriodStart,
+        note: note ?? null,
+      },
+    }
+  );
+}
+
+/** Spec 017: retira la validación de la celda. Antes no había forma de deshacerla. */
+export async function unvalidateDocumentType(
+  supplierId: number,
+  documentTypeId: number,
+  coveragePeriodStart: string | null,
+): Promise<{ status: string; document_id: number }> {
+  return apiFetch<{ status: string; document_id: number }>(
+    `/suppliers/${supplierId}/compliance/unvalidate`,
+    {
+      method: "POST",
+      json: {
+        document_type_id: documentTypeId,
+        coverage_period_start: coveragePeriodStart,
+      },
+    }
+  );
 }

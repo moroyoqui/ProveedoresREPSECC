@@ -5,12 +5,16 @@ type Props = {
   document: Pick<DocumentOut, "verified" | "audit">;
 };
 
-/** Renderiza "Verificado" / "Sin verificar" con tooltip de usuario y fecha (FR-011c). */
+/** Renderiza "Validado" / "Sin validar" con tooltip de usuario y fecha.
+ *
+ * Spec 017 (FR-011): la interfaz usa una sola palabra, "Validado". El campo
+ * interno sigue llamándose `verified` — nadie fuera del código lo ve.
+ */
 export function VerifiedBadge({ document }: Props) {
   const { verified, audit } = document;
 
   if (!verified) {
-    return <Badge tone="neutral">Sin verificar</Badge>;
+    return <Badge tone="neutral">Sin validar</Badge>;
   }
 
   const validated = audit.validated;
@@ -24,7 +28,7 @@ export function VerifiedBadge({ document }: Props) {
       title={tooltip}
       className="cursor-default"
     >
-      Verificado
+      Validado
     </Badge>
   );
 }

@@ -20,7 +20,7 @@ from repse.documents.models import Document, DocumentStatus, OcrStatus
 from repse.documents.ocr import run_ocr
 from repse.documents.status import compute_status
 from repse.documents.storage import FileStore
-from repse.errors import Conflict, NotFound, ValidationFailure
+from repse.errors import Conflict, Forbidden, NotFound, ValidationFailure
 from repse.document_types.models import DocumentType, Periodicity
 from repse.organizations.models import Organization
 from repse.suppliers.models import Supplier
@@ -340,10 +340,15 @@ def delete_document(
     grace_hours: int | None,
     settings: Settings,
     reason: str | None = None,
+    require_owner: bool = False,
 ) -> None:
     """Borra un documento dentro de la ventana de gracia (T098 spec 001).
 
     Reglas:
+      * Con ``require_owner=True`` (spec 016) sólo el autor de la carga puede
+        borrar. La ruta del back-office ya lo comprueba para fijar el orden de
+        los errores; aquí se repite a propósito, para que ningún llamador
+        futuro pueda saltarse la restricción (constitución, principio I).
       * Sólo si ``now - created_at`` ≤ ``grace_hours``. Con ``grace_hours=None``
         no se aplica ventana de tiempo (el portal del proveedor controla el
         permiso por estado de la celda, no por antigüedad).
@@ -354,8 +359,14 @@ def delete_document(
       * Auditado como ``document.deleted``.
     """
     doc = db.get(Document, document_id)
-    if doc is None:
+    if doc is None or doc.deleted_at is not None:
         raise NotFound("Document not found")
+
+    if require_owner and doc.uploaded_by != actor_user_id:
+        raise Forbidden(
+            "Only the uploader can delete this document",
+            details={"code": "not_document_owner"},
+        )
 
     now = datetime.now(timezone.utc)
     if grace_hours is not None:

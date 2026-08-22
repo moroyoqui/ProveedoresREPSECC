@@ -20,6 +20,16 @@ from repse.db.tenant_filter import TenantOwned
 
 
 class ComplianceCellValidation(Base, TimestampMixin, TenantOwned):
+    """OBSOLETA desde spec 017 — no leer ni escribir.
+
+    El estado "validado" de una celda dejó de vivir aquí: ahora se deriva del
+    documento vigente (`documents.verified`), que es la única fuente de verdad.
+    La migración 0013 trasladó el contenido aprovechable y la tabla quedó inerte
+    como red de seguridad; su retirada definitiva es una migración posterior.
+
+    Si necesitas saber si una celda está validada, mira su documento vigente.
+    """
+
     __tablename__ = "compliance_cell_validations"
     __table_args__ = (
         UniqueConstraint(

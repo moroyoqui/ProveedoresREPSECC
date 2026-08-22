@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 from repse.audit import actions as audit_actions
 from repse.audit.models import AuditLog
 from repse.auth.dependencies import CurrentUser, current_user, require_role
+from repse.compliance.cell_locks import check_cell_unlocked
 from repse.config import Settings, get_settings
 from repse.db.session import get_db
 from repse.document_types.models import DocumentType
@@ -28,7 +29,7 @@ from repse.documents.models import Document, OcrStatus
 from repse.documents.schemas import VerifyIn
 from repse.documents.service import UploadInput
 from repse.documents.storage import FileStore, InvalidToken, TokenExpired
-from repse.errors import Forbidden, NotFound, ValidationFailure
+from repse.errors import Conflict, Forbidden, NotFound, ValidationFailure
 from repse.suppliers.models import Supplier
 from repse.users.models import Role, User
 
@@ -76,7 +77,7 @@ def upload_document(
         body=body,
         settings=settings,
     )
-    return _serialize(db, doc)
+    return _serialize(db, doc, user=user)
 
 
 @router.get("/documents")
@@ -117,7 +118,7 @@ def list_documents(
     has_more = len(docs) > limit
     docs = docs[:limit]
     return {
-        "items": [_serialize(db, d, include_supplier=True) for d in docs],
+        "items": [_serialize(db, d, include_supplier=True, user=user) for d in docs],
         "next_cursor": None,
         "has_more": has_more,
     }
@@ -132,7 +133,7 @@ def get_document(
     doc = db.get(Document, document_id)
     if doc is None:
         raise NotFound("Document not found")
-    return _serialize(db, doc)
+    return _serialize(db, doc, user=user)
 
 
 # ---------- Download tokens + serving ----------
@@ -179,7 +180,14 @@ def download_file(
         raise Forbidden("Token does not belong to this tenant", details={"code": "tenant_mismatch"})
 
     doc = db.get(Document, payload.get("file_id"))
-    if doc is None or doc.organization_id != user.organization_id:
+    # `deleted_at`: spec 016 FR-010 — un token emitido antes del borrado ya no
+    # sirve el archivo. Sin esta condición la fila soft-deleted sigue apuntando
+    # a un archivo inexistente y la descarga revienta con 500 en vez de 404.
+    if (
+        doc is None
+        or doc.organization_id != user.organization_id
+        or doc.deleted_at is not None
+    ):
         raise NotFound("Document not found")
 
     # Spec 013 (FR-010): un proveedor solo puede descargar archivos de su empresa.
@@ -212,13 +220,15 @@ def verify_document_route(
         actor_user_id=user.user_id,
         note=body.note,
     )
-    return _serialize(db, doc)
+    return _serialize(db, doc, user=user)
 
 
 @router.post("/documents/{document_id}/unverify")
 def unverify_document_route(
     document_id: int,
-    user: CurrentUser = Depends(require_role(Role.ADMIN.value)),
+    # Spec 017 (FR-007): antes exclusivo de admin. Se abre al manager para que
+    # ambas pantallas se comporten igual y quien valida pueda deshacer su error.
+    user: CurrentUser = Depends(require_role(Role.ADMIN.value, Role.MANAGER.value)),
     db: Session = Depends(get_db),
 ) -> dict:
     doc = service.unverify_document(
@@ -227,7 +237,7 @@ def unverify_document_route(
         organization_id=user.organization_id,
         actor_user_id=user.user_id,
     )
-    return _serialize(db, doc)
+    return _serialize(db, doc, user=user)
 
 
 # ---------- Delete (with grace window) ----------
@@ -236,10 +246,41 @@ def unverify_document_route(
 @router.delete("/documents/{document_id}", status_code=204)
 def delete_document_route(
     document_id: int,
-    user: CurrentUser = Depends(require_role(Role.ADMIN.value)),
+    user: CurrentUser = Depends(require_role(Role.ADMIN.value, Role.MANAGER.value)),
     db: Session = Depends(get_db),
     settings: Settings = Depends(get_settings),
 ) -> Response:
+    """Borra un documento del back-office (spec 016).
+
+    El admin borra cualquiera; el manager sólo lo que subió él. Las reglas de
+    canal (documento verificado, celda bloqueada) se comprueban aquí y no en el
+    service, según la convención descrita en portal/routes_write.py.
+    """
+    doc = db.get(Document, document_id)
+    if doc is None or doc.deleted_at is not None:
+        raise NotFound("Document not found")
+
+    is_owner = doc.uploaded_by == user.user_id
+    if user.role != Role.ADMIN.value and not is_owner:
+        raise Forbidden(
+            "Only the uploader can delete this document",
+            details={"code": "not_document_owner"},
+        )
+
+    if doc.verified:
+        raise Conflict(
+            "Delete not allowed: document is verified",
+            details={"code": "document_verified"},
+        )
+
+    check_cell_unlocked(
+        db,
+        organization_id=user.organization_id,
+        supplier_id=doc.supplier_id,
+        document_type_id=doc.document_type_id,
+        coverage_period_start=doc.coverage_period_start,
+    )
+
     service.delete_document(
         db,
         document_id=document_id,
@@ -247,6 +288,7 @@ def delete_document_route(
         actor_user_id=user.user_id,
         grace_hours=settings.document_delete_grace_hours,
         settings=settings,
+        require_owner=user.role != Role.ADMIN.value,
     )
     return Response(status_code=204)
 
@@ -254,10 +296,13 @@ def delete_document_route(
 # ---------- History (audit timeline for one document) ----------
 
 
+# Spec 017 (FR-011): estos textos se muestran al usuario en el historial, así
+# que usan el mismo término que el resto de la interfaz: "validado". Las claves
+# de acción (`document.verified`) no cambian — son datos de auditoría ya escritos.
 _HUMAN_SUMMARIES: dict[str, str] = {
     audit_actions.DOCUMENT_UPLOADED: "Subió el documento",
-    audit_actions.DOCUMENT_VERIFIED: "Marcó como verificado",
-    audit_actions.DOCUMENT_UNVERIFIED: "Quitó la verificación",
+    audit_actions.DOCUMENT_VERIFIED: "Marcó como validado",
+    audit_actions.DOCUMENT_UNVERIFIED: "Quitó la validación",
     audit_actions.DOCUMENT_DELETED: "Eliminó el documento",
     audit_actions.DOCUMENT_DELETED_BY_SUPPLIER_TYPE_CHANGE: "Eliminado por cambio de tipo de proveedor",
 }
@@ -347,7 +392,36 @@ def get_document_history(
 # ---------- Serializer ----------
 
 
-def _serialize(db: Session, doc: Document, *, include_supplier: bool = False) -> dict:
+def _can_delete(doc: Document, user: CurrentUser | None) -> bool:
+    """Spec 016: ¿este usuario puede intentar borrar este documento?
+
+    Gobierna la visibilidad del botón en el back-office. Deliberadamente NO
+    consulta el estado de la celda: hacerlo costaría dos consultas por fila del
+    listado. Esa condición se evalúa al ejecutar el borrado, que puede devolver
+    409 aunque el campo venga en true.
+    """
+    if user is None or user.role not in (Role.ADMIN.value, Role.MANAGER.value):
+        return False
+    if doc.deleted_at is not None or doc.verified:
+        return False
+    if user.role != Role.ADMIN.value and doc.uploaded_by != user.user_id:
+        return False
+
+    grace_hours = get_settings().document_delete_grace_hours
+    created_at = doc.created_at
+    if created_at.tzinfo is None:
+        created_at = created_at.replace(tzinfo=timezone.utc)
+    elapsed = (datetime.now(timezone.utc) - created_at).total_seconds()
+    return elapsed <= grace_hours * 3600
+
+
+def _serialize(
+    db: Session,
+    doc: Document,
+    *,
+    include_supplier: bool = False,
+    user: CurrentUser | None = None,
+) -> dict:
     uploader = db.get(User, doc.uploaded_by)
     last_updated_user = db.get(User, doc.last_updated_by) if doc.last_updated_by else None
     verified_user = db.get(User, doc.verified_by) if doc.verified_by else None
@@ -370,6 +444,7 @@ def _serialize(db: Session, doc: Document, *, include_supplier: bool = False) ->
         "verified_note": doc.verified_note,
         "version": doc.version,
         "is_latest": doc.is_latest,
+        "can_delete": _can_delete(doc, user),
         "file": {
             "name": doc.file_name_original,
             "size_bytes": doc.file_size_bytes,

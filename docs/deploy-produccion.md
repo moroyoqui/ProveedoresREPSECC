@@ -101,7 +101,8 @@ Imprescindibles:
 
 - `APP_SECRET` → `openssl rand -hex 32`
 - `DB_PASS` y `MYSQL_PASSWORD` con **el mismo valor**; `MYSQL_ROOT_PASSWORD` aparte
-- `CADDY_DOMAIN` y `APP_BASE_URL` con el dominio real
+- `CADDY_DOMAIN` y `APP_BASE_URL` con el dominio real (producción:
+  `portaldeproveedores.inverbay.com`)
 - El primer usuario administrador: se crea con `scripts/create_admin.py` (el acceso es
   por email + contraseña; no hay alta automática al iniciar sesión)
 - SMTP real (`ALERTS_SCHEDULER_ENABLED=true` envía correos de verdad)

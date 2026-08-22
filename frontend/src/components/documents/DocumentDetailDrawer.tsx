@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 
 import { Button } from "@/components/ui/Button";
+import { DestructiveConfirmDialog } from "@/components/ui/DestructiveConfirmDialog";
 import { ComplianceBadge } from "@/components/documents/ComplianceBadge";
 import { VerifiedBadge } from "@/components/documents/VerifiedBadge";
 import { HistoryTab } from "@/components/documents/HistoryTab";
@@ -40,23 +41,66 @@ type Props = {
   onClose: () => void;
   onVerify: () => void;
   onUnverifySuccess: () => void;
+  onDeleteSuccess: () => void;
 };
 
-export function DocumentDetailDrawer({ document: doc, onClose, onVerify, onUnverifySuccess }: Props) {
+export function DocumentDetailDrawer({
+  document: doc,
+  onClose,
+  onVerify,
+  onUnverifySuccess,
+  onDeleteSuccess,
+}: Props) {
   const { user } = useAuth();
   const [tab, setTab] = useState<Tab>("info");
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [unverifyError, setUnverifyError] = useState<string | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const canVerify = !doc.verified && (user?.role === "admin" || user?.role === "manager");
-  const canUnverify = doc.verified && user?.role === "admin";
+  // Spec 017 (FR-007): antes sólo admin. Quien valida puede deshacerlo.
+  const canUnverify = doc.verified && (user?.role === "admin" || user?.role === "manager");
+  // Spec 016: el servidor decide; el cliente sólo obedece el flag.
+  const canDelete = doc.can_delete;
+
+  const DELETE_ERRORS: Record<string, string> = {
+    not_document_owner: "Sólo quien subió el documento puede eliminarlo.",
+    document_verified: "El documento está validado. Hay que quitar la validación antes de eliminarlo.",
+    delete_not_allowed:
+      "La celda ya fue enviada a validación o validada; no se puede eliminar el documento.",
+    delete_window_expired: "Expiró el plazo para eliminar este documento.",
+  };
+
+  const remove = useMutation({
+    mutationFn: () => documentsApi.remove(doc.id),
+    onSuccess: () => {
+      setConfirmingDelete(false);
+      onDeleteSuccess();
+    },
+    onError: (e: unknown) => {
+      setConfirmingDelete(false);
+      if (e instanceof ApiError) {
+        // Doble clic / doble confirmación: el documento ya no está, que es
+        // justo lo que el usuario pidió. No hay error que mostrar.
+        if (e.status === 404) {
+          onDeleteSuccess();
+          return;
+        }
+        const code = (e.details?.code as string | undefined) ?? "";
+        setDeleteError(DELETE_ERRORS[code] ?? e.message);
+        return;
+      }
+      setDeleteError("No se pudo eliminar el documento.");
+    },
+  });
 
   const unverify = useMutation({
     mutationFn: () => documentsApi.unverify(doc.id),
     onSuccess: onUnverifySuccess,
     onError: (e: unknown) => {
-      setUnverifyError(e instanceof ApiError ? e.message : "Error al quitar verificación.");
+      setUnverifyError(e instanceof ApiError ? e.message : "Error al quitar la validación.");
     },
   });
 
@@ -242,15 +286,29 @@ export function DocumentDetailDrawer({ document: doc, onClose, onVerify, onUnver
         </div>
 
         {/* Footer actions */}
-        {(canVerify || canUnverify) && (
+        {(canVerify || canUnverify || canDelete) && (
           <div className="border-t border-neutral-200 px-6 py-4">
             {unverifyError && (
               <p className="mb-3 text-xs text-red-600">{unverifyError}</p>
             )}
+            {deleteError && <p className="mb-3 text-xs text-red-600">{deleteError}</p>}
             <div className="flex justify-end gap-2">
+              {canDelete && (
+                <Button
+                  variant="danger"
+                  size="sm"
+                  disabled={remove.isPending}
+                  onClick={() => {
+                    setDeleteError(null);
+                    setConfirmingDelete(true);
+                  }}
+                >
+                  {remove.isPending ? "Eliminando…" : "Eliminar"}
+                </Button>
+              )}
               {canVerify && (
                 <Button variant="primary" size="sm" onClick={onVerify}>
-                  Verificar documento
+                  Validar documento
                 </Button>
               )}
               {canUnverify && (
@@ -260,13 +318,36 @@ export function DocumentDetailDrawer({ document: doc, onClose, onVerify, onUnver
                   disabled={unverify.isPending}
                   onClick={() => unverify.mutate()}
                 >
-                  {unverify.isPending ? "Quitando…" : "Quitar verificación"}
+                  {unverify.isPending ? "Quitando…" : "Quitar validación"}
                 </Button>
               )}
             </div>
           </div>
         )}
       </div>
+
+      {confirmingDelete && (
+        <DestructiveConfirmDialog
+          title="Eliminar documento"
+          description="Esta acción no se puede deshacer: el archivo se elimina y la celda de cumplimiento vuelve a su estado anterior."
+          itemsLabel="Documento a eliminar"
+          confirmLabel="Eliminar documento"
+          busy={remove.isPending}
+          items={[
+            {
+              id: doc.id,
+              primary: `${doc.supplier?.legal_name ?? "Proveedor"} · ${doc.document_type.name}`,
+              secondary: doc.coverage_period_start
+                ? `Período ${fmtDate(doc.coverage_period_start)}${
+                    doc.coverage_period_end ? ` – ${fmtDate(doc.coverage_period_end)}` : ""
+                  }`
+                : doc.file.name,
+            },
+          ]}
+          onConfirm={() => remove.mutate()}
+          onCancel={() => setConfirmingDelete(false)}
+        />
+      )}
     </>
   );
 }

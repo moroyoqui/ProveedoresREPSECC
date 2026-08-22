@@ -22,7 +22,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from repse.auth.dependencies import CurrentUser, require_role
-from repse.compliance.models import ComplianceCellValidation
+from repse.compliance.cell_locks import check_cell_unlocked
 from repse.config import Settings, get_settings
 from repse.db.session import get_db
 from repse.db.tenant_filter import set_current_tenant
@@ -174,15 +174,22 @@ def portal_submit(
             details={"code": "already_submitted"},
         )
 
-    validation = db.execute(
-        select(ComplianceCellValidation).where(
-            ComplianceCellValidation.organization_id == user.organization_id,
-            ComplianceCellValidation.supplier_id == user.supplier_id,
-            ComplianceCellValidation.document_type_id == document_type_id,
-            ComplianceCellValidation.coverage_period_start == period_start,
+    # Spec 017: "celda validada" se lee del documento vigente, no de la tabla
+    # obsoleta `compliance_cell_validations`. Seguir consultándola dejaría al
+    # proveedor reenviar celdas ya validadas, porque las validaciones nuevas ya
+    # no se escriben allí.
+    validated_doc = db.execute(
+        select(Document).where(
+            Document.organization_id == user.organization_id,
+            Document.supplier_id == user.supplier_id,
+            Document.document_type_id == document_type_id,
+            Document.coverage_period_start == period_start,
+            Document.is_latest.is_(True),
+            Document.deleted_at.is_(None),
+            Document.verified.is_(True),
         )
     ).scalar_one_or_none()
-    if validation is not None:
+    if validated_doc is not None:
         raise Conflict(
             "Cell is already validated",
             details={"code": "cell_not_submittable"},
@@ -264,7 +271,7 @@ def portal_delete_document(
     ):
         raise NotFound("Document not found")
 
-    _check_delete_allowed(
+    check_cell_unlocked(
         db,
         organization_id=user.organization_id,
         supplier_id=user.supplier_id,
@@ -279,47 +286,11 @@ def portal_delete_document(
         actor_user_id=user.user_id,
         grace_hours=None,
         settings=settings,
+        # El proveedor borra por celda, no por autoría: un documento cargado por
+        # el back-office para su empresa sigue siendo suyo a estos efectos.
+        require_owner=False,
     )
     return Response(status_code=204)
-
-
-def _check_delete_allowed(
-    db: Session,
-    *,
-    organization_id: int,
-    supplier_id: int,
-    document_type_id: int,
-    coverage_period_start: date | None,
-) -> None:
-    """Raise Conflict if the cell is already submitted for validation or validated."""
-    pending = db.execute(
-        select(PortalSubmission).where(
-            PortalSubmission.organization_id == organization_id,
-            PortalSubmission.supplier_id == supplier_id,
-            PortalSubmission.document_type_id == document_type_id,
-            PortalSubmission.coverage_period_start == coverage_period_start,
-            PortalSubmission.status == SubmissionStatus.PENDING,
-        )
-    ).scalar_one_or_none()
-    if pending is not None:
-        raise Conflict(
-            "Delete not allowed: cell already submitted for validation",
-            details={"code": "delete_not_allowed"},
-        )
-
-    validated = db.execute(
-        select(ComplianceCellValidation).where(
-            ComplianceCellValidation.organization_id == organization_id,
-            ComplianceCellValidation.supplier_id == supplier_id,
-            ComplianceCellValidation.document_type_id == document_type_id,
-            ComplianceCellValidation.coverage_period_start == coverage_period_start,
-        )
-    ).scalar_one_or_none()
-    if validated is not None:
-        raise Conflict(
-            "Delete not allowed: cell is validated",
-            details={"code": "delete_not_allowed"},
-        )
 
 
 def _check_upload_allowed(
@@ -346,12 +317,16 @@ def _check_upload_allowed(
             details={"code": "upload_not_allowed"},
         )
 
+    # Spec 017: misma razón que en portal_submit — la marca vive en el documento.
     validated = db.execute(
-        select(ComplianceCellValidation).where(
-            ComplianceCellValidation.organization_id == organization_id,
-            ComplianceCellValidation.supplier_id == supplier_id,
-            ComplianceCellValidation.document_type_id == document_type_id,
-            ComplianceCellValidation.coverage_period_start == coverage_period_start,
+        select(Document).where(
+            Document.organization_id == organization_id,
+            Document.supplier_id == supplier_id,
+            Document.document_type_id == document_type_id,
+            Document.coverage_period_start == coverage_period_start,
+            Document.is_latest.is_(True),
+            Document.deleted_at.is_(None),
+            Document.verified.is_(True),
         )
     ).scalar_one_or_none()
     if validated is not None:

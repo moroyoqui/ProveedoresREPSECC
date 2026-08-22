@@ -372,6 +372,8 @@ export type DocumentOut = {
   verified: boolean;
   version: number;
   is_latest: boolean;
+  /** Spec 016: el servidor decide si este usuario puede borrar este documento. */
+  can_delete: boolean;
   file: { name: string; size_bytes: number; mime_type: string; sha256: string };
   ocr: {
     status: "not_run" | "pending" | "success" | "failed";
@@ -426,6 +428,8 @@ export const documentsApi = {
     }),
   unverify: (id: number) =>
     apiFetch<DocumentOut>(`/documents/${id}/unverify`, { method: "POST" }),
+  remove: (id: number) =>
+    apiFetch<void>(`/documents/${id}`, { method: "DELETE" }),
   history: (id: number) =>
     apiFetch<{ items: HistoryItem[]; next_cursor: string | null; has_more: boolean }>(
       `/documents/${id}/history`
